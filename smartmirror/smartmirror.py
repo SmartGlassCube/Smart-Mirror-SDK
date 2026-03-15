@@ -1,35 +1,49 @@
-from collections.abc import Set
-
 from .hal import HAL
 from .cv import GestureDetector
 from .config import StateManager
 
+import asyncio
+from pathlib import Path
 import os
 import urllib.request
 import json
+import shutil
 import websockets
 
 class SmartMirrorServer:
 
     def __init__(self,
                   graph,
-                  hardware = HAL.HAL(),
+                  hardware = None,
                   assistant = None,
                   with_camera = True,
                   with_microphone = False,
-                  state_manager = StateManager.StateManager(),
-                  gesture_detector = GestureDetector.GestureDetector(),
+                  state_manager = None,
+                  gesture_detector = None,
                   edit_gesture = None,
-                  ws_port = 8080):
+                  ws_port = 8080,
+                  with_ui = True,
+                  ui_dir = None,
+                  ui_host = "localhost",
+                  ui_port = 5173):
         
-        self.hardware = hardware
-        self.state_manager = state_manager
-        self.gesture_detector = gesture_detector
+        self.hardware = hardware or HAL.HAL()
+        self.state_manager = state_manager or StateManager.StateManager()
+        self.gesture_detector = gesture_detector or GestureDetector.GestureDetector()
         self.ws_port = ws_port
         self.graph = graph
         self.assistant = assistant
+        self.with_camera = with_camera
+        self.with_microphone = with_microphone
+        self.with_ui = with_ui
+        self.ui_host = ui_host
+        self.ui_port = ui_port
+        self.ui_dir = Path(ui_dir) if ui_dir else self._get_default_ui_dir()
+        self.ui_process = None
 
         self.edit_gesture = edit_gesture
+
+        self.state_manager.set_graph(self.graph)
 
         self.model_path = self._ensure_model()
 
@@ -50,6 +64,64 @@ class SmartMirrorServer:
             url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
             urllib.request.urlretrieve(url, model_path)
         return model_path
+
+    def _get_default_ui_dir(self) -> Path:
+        return Path(__file__).resolve().parent.parent / "ui"
+
+    async def _ensure_ui_dependencies(self):
+        if not self.ui_dir.exists():
+            print(f"[UI] Skipping launch: UI directory not found at {self.ui_dir}")
+            return False
+
+        # TODO: install npm if not found
+        if shutil.which("npm") is None:
+            print("[UI] Skipping launch: npm is not installed or not in PATH")
+            return False
+
+        node_modules = self.ui_dir / "node_modules"
+        if node_modules.exists():
+            return True
+
+        print("[UI] Installing UI dependencies (npm install)...")
+        install_process = await asyncio.create_subprocess_exec(
+            "npm",
+            "install",
+            cwd=str(self.ui_dir),
+        )
+        return_code = await install_process.wait()
+        if return_code != 0:
+            print(f"[UI] npm install failed with exit code {return_code}")
+            return False
+
+        return True
+
+    async def _start_ui(self):
+        if not self.with_ui:
+            return
+
+        if not await self._ensure_ui_dependencies():
+            return
+
+        print(f"[UI] Starting UI on http://{self.ui_host}:{self.ui_port}")
+        self.ui_process = await asyncio.create_subprocess_exec(
+            "npm",
+            "run",
+            "dev",
+            "--",
+            "--host",
+            self.ui_host,
+            "--port",
+            str(self.ui_port),
+            cwd=str(self.ui_dir),
+        )
+
+    async def _stop_ui(self):
+        if self.ui_process is None:
+            return
+
+        self.ui_process.terminate()
+        await self.ui_process.wait()
+        self.ui_process = None
     
     async def broadcast(self, message: dict):
         """Send message to all connected WebSocket clients."""
@@ -85,7 +157,7 @@ class SmartMirrorServer:
             # Send initial state
             await websocket.send(json.dumps({
                 "type": "INIT",
-                # "state": self.state_manager.get_state_snapshot()
+                "state": self.state_manager.get_state_snapshot()
             }))
             
             # Keep connection open, handle any incoming messages
@@ -152,10 +224,8 @@ class SmartMirrorServer:
         #         # Small delay to prevent CPU overload
         #         await asyncio.sleep(0.01)
                 
-        # finally:
-        #     cap.release()
-        #     cv2.destroyAllWindows()
-        #     print("[Camera] Stopped capture")
+        while self.running:
+            await asyncio.sleep(0.1)
     
     async def run(self):
         """Start the server."""
@@ -163,6 +233,10 @@ class SmartMirrorServer:
         print(f"[Server] WebSocket server on ws://localhost:{self.ws_port}")
 
         self.running = True
-        
-        async with websockets.serve(self.handle_client, "localhost", self.ws_port):
-            await self.camera_loop()
+
+        try:
+            async with websockets.serve(self.handle_client, "localhost", self.ws_port):
+                await self._start_ui()
+                await self.camera_loop()
+        finally:
+            await self._stop_ui()
