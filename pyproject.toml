@@ -29,6 +29,9 @@ dev = [
   "mypy",
   "ruff"
 ]
+data = [
+  "pymongo>=4.7.0"
+]
 
 [tool.setuptools.packages.find]
 where = ["."]

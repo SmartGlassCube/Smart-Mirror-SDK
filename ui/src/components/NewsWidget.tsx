@@ -7,7 +7,13 @@ const newsList = [
   'Stay tuned for more updates!'
 ];
 
-const NewsWidget = () => {
+type NewsWidgetProps = {
+  widget?: {
+    content?: string;
+  };
+};
+
+const NewsWidget = ({ widget }: NewsWidgetProps) => {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -20,7 +26,7 @@ const NewsWidget = () => {
   return (
     <div className="widget news-widget">
       <h2>News</h2>
-      <div style={{ minHeight: 40 }}>{newsList[index]}</div>
+      <div style={{ minHeight: 40 }}>{widget?.content ?? newsList[index]}</div>
     </div>
   );
 };
