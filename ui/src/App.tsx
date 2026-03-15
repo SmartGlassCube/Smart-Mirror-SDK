@@ -4,6 +4,7 @@ import CalendarWidget from './components/CalendarWidget'
 import WeatherWidget from './components/WeatherWidget'
 import NewsWidget from './components/NewsWidget'
 import TextWidget from './components/TextWidget'
+import QrGalleryWidget from './components/QrGalleryWidget'
 import { useWebSocket } from './hooks/useWebSocket'
 
 type Position = {
@@ -12,9 +13,10 @@ type Position = {
 }
 
 type MirrorWidget = {
-  type: 'calendar' | 'weather' | 'news' | 'text'
+  type: 'calendar' | 'weather' | 'news' | 'text' | 'qr_gallery'
   position?: Position
   content?: string
+  data?: Record<string, unknown>
 }
 
 type MirrorState = {
@@ -31,7 +33,7 @@ function App() {
   const [state, setState] = useState<MirrorState>({ nodeId: null, widgets: [] })
 
   const onMessage = useCallback((message: BackendMessage) => {
-    if (message.type === 'INIT' && message.state) {
+    if ((message.type === 'INIT' || message.type === 'STATE_UPDATE') && message.state) {
       setState(message.state)
     }
   }, [])
@@ -57,6 +59,8 @@ function App() {
       component = <NewsWidget widget={widget} />
     } else if (widget.type === 'text') {
       component = <TextWidget widget={widget} />
+    } else if (widget.type === 'qr_gallery') {
+      component = <QrGalleryWidget widget={widget} />
     }
 
     if (!component) {
