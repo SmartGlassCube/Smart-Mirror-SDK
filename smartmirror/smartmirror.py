@@ -3,11 +3,13 @@ from .cv import GestureDetector
 from .config import StateManager
 
 import asyncio
+import inspect
 from pathlib import Path
 import os
 import urllib.request
 import json
 import shutil
+import time
 import websockets
 
 class SmartMirrorServer:
@@ -54,6 +56,7 @@ class SmartMirrorServer:
 
         self.last_hands_update = 0
         self.hands_update_interval = 0.05 
+        self.widget_update_tick = 0.5
 
     # can be replaced
     def _ensure_model(self) -> str:
@@ -173,6 +176,60 @@ class SmartMirrorServer:
             self.clients.discard(websocket)
             print(f"[WS] Client {client_id} disconnected. Total: {len(self.clients)}")
 
+    async def _run_data_provider(self, widget):
+        provider = getattr(widget, "data_provider", None)
+        if provider is None:
+            return None
+
+        try:
+            value = provider(widget)
+        except TypeError:
+            value = provider()
+
+        if inspect.isawaitable(value):
+            value = await value
+
+        return value
+
+    async def _refresh_widget_data(self):
+        widgets = self.state_manager.get_current_widgets()
+        if not widgets:
+            return
+
+        now = time.time()
+        changed = False
+
+        for widget in widgets:
+            provider = getattr(widget, "data_provider", None)
+            if provider is None:
+                continue
+
+            interval = getattr(widget, "refresh_interval", 60) or 60
+            last_update = getattr(widget, "_last_data_update", 0.0)
+
+            if now - last_update < interval:
+                continue
+
+            try:
+                new_data = await self._run_data_provider(widget)
+            except Exception as error:
+                print(f"[WidgetData] Failed to refresh {getattr(widget, 'type', 'unknown')} widget: {error}")
+                widget._last_data_update = now
+                continue
+
+            previous_data = getattr(widget, "data", None)
+            widget.data = new_data
+            widget._last_data_update = now
+
+            if previous_data != new_data:
+                changed = True
+
+        if changed:
+            await self.broadcast({
+                "type": "STATE_UPDATE",
+                "state": self.state_manager.get_state_snapshot(),
+            })
+
     async def camera_loop(self):
         """Main camera processing loop."""
         # cap = cv2.VideoCapture(self.camera_id)
@@ -225,7 +282,8 @@ class SmartMirrorServer:
         #         await asyncio.sleep(0.01)
                 
         while self.running:
-            await asyncio.sleep(0.1)
+            await self._refresh_widget_data()
+            await asyncio.sleep(self.widget_update_tick)
     
     async def run(self):
         """Start the server."""

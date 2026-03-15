@@ -23,6 +23,12 @@ class StateManager:
                 return node
         return None
 
+    def get_current_widgets(self):
+        current_node = self.get_current_node()
+        if not current_node:
+            return []
+        return current_node.get("widgets", [])
+
     def get_state_snapshot(self):
         current_node = self.get_current_node() or {"id": None, "widgets": []}
         widgets = current_node.get("widgets", [])
