@@ -1,26 +1,16 @@
-import { useState } from 'react';
+type TextWidgetProps = {
+  widget?: {
+    content?: string;
+  };
+};
 
-const texts = [
-  'Welcome to Smart Mirror!',
-  'Swipe to see more info.',
-  'Stay productive and healthy!',
-  'Have a great day!'
-];
-
-const TextWidget = () => {
-  const [index, setIndex] = useState(0);
-
-  const nextText = () => setIndex((i) => (i + 1) % texts.length);
-  const prevText = () => setIndex((i) => (i - 1 + texts.length) % texts.length);
+const TextWidget = ({ widget }: TextWidgetProps) => {
+  const content = widget?.content ?? 'Welcome to Smart Mirror!';
 
   return (
     <div className="widget text-widget">
       <h2>Text</h2>
-      <div style={{ minHeight: 40 }}>{texts[index]}</div>
-      <div>
-        <button onClick={prevText}>⏪</button>
-        <button onClick={nextText}>⏩</button>
-      </div>
+      <div style={{ minHeight: 40 }}>{content}</div>
     </div>
   );
 };
