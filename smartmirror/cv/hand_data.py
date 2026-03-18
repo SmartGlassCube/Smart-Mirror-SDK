@@ -39,9 +39,9 @@ class HandsData:
             positions = [(lm.x, lm.y, lm.z) for lm in hand_landmarks]
 
             if label == "Left":
-                self.left = positions
-            else:
                 self.right = positions
+            else:
+                self.left = positions
 
     def close(self):
         self._landmarker.close()
