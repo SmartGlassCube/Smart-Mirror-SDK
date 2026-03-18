@@ -454,3 +454,287 @@ class GestureDetector:
         if delta_y < 0:
             return GestureEvent(type=GestureType.SWIPE_UP, hand=side)
         return GestureEvent(type=GestureType.SWIPE_DOWN, hand=side)
+
+# -----------------------------[ GestureDetector – Full Processing Spec ]-----------------------------------------------------
+"""
+
+----------------------------------------
+1. Entry Point
+----------------------------------------
+
+def process_frame(frame) -> dict
+
+Pipeline:
+    frame
+      ↓
+    LandmarkDetector.extract_hands(frame)
+      ↓
+    hands (Dict[str, HandData])
+      ↓
+    process_hands(hands)
+      ↓
+    result dict returned
+
+Frames are NOT stored. Only extracted features and small temporal memory are kept.
+
+----------------------------------------
+2. Internal Method
+----------------------------------------
+
+def process_hands(hands: Dict[str, HandData]) -> dict
+
+This method:
+- computes posture signals
+- computes motion/deltas
+- detects gesture transitions (events)
+- updates internal memory
+- returns final result
+
+----------------------------------------
+3. Return Structure
+----------------------------------------
+
+{
+    "hands": {...},
+    "signals": {...},
+    "events": [...]
+}
+
+----------------------------------------
+4. "hands" Field
+----------------------------------------
+
+Structure:
+{
+    "left": HandData(...),
+    "right": HandData(...),
+}
+
+Meaning:
+- Raw structured output from LandmarkDetector
+- Contains:
+    - landmarks
+    - palm_center
+    - bounding box
+    - is_raised flag
+
+Purpose:
+- debugging
+- future improvements
+- raw geometry access
+
+----------------------------------------
+5. "signals" Field
+----------------------------------------
+
+Signals = continuous states (true NOW on this frame)
+
+Structure:
+
+{
+    "hand_count": int,
+    "left_detected": bool,
+    "right_detected": bool,
+
+    "pinching": {side: bool},
+
+    "index_up": {side: bool},
+    "middle_up": {side: bool},
+    "ring_up": {side: bool},
+    "pinky_up": {side: bool},
+
+    "hover_posture": {side: bool},
+    "open_hand": {side: bool},
+
+    "both_hands_raised": bool,
+
+    "pointer_position": {side: (x, y) or None},
+    "pointer_delta": {side: (dx, dy) or None},
+
+    "horizontal_delta": {side: dx or None},
+    "vertical_delta": {side: dy or None},
+
+    "thumb_index_distance": {side: float or None},
+    "thumb_index_distance_delta": {side: float or None},
+
+    "zoom_mode_pinky_up": {side: bool},
+    "zoom_mode_no_pinky": {side: bool},
+}
+
+----------------------------------------
+Signal Definitions
+----------------------------------------
+
+hand_count:
+    Number of detected hands (0, 1, 2)
+
+left_detected / right_detected:
+    Whether each hand is visible
+
+pinching:
+    Whether thumb and index are close (state, not event)
+
+index_up / middle_up / ring_up / pinky_up:
+    Finger posture (tip_y < pip_y)
+
+hover_posture:
+    index_up AND middle_up
+
+open_hand:
+    At least 3 of {index, middle, ring, pinky} are up AND not pinching
+
+both_hands_raised:
+    Both hands marked as raised
+
+pointer_position:
+    Index fingertip position (fallback to palm center if needed)
+
+pointer_delta:
+    Movement since previous frame:
+        (dx, dy) = (x_t - x_{t-1}, y_t - y_{t-1})
+
+horizontal_delta / vertical_delta:
+    Decomposed pointer movement
+
+thumb_index_distance:
+    Euclidean distance between thumb tip and index tip
+
+thumb_index_distance_delta:
+    Change in span since previous frame
+
+zoom_mode_pinky_up:
+    Valid zoom posture AND pinky_up == True
+
+zoom_mode_no_pinky:
+    Valid zoom posture AND pinky_up == False
+
+----------------------------------------
+6. "events" Field
+----------------------------------------
+
+Events = transitions detected ON THIS FRAME ONLY
+
+Structure:
+
+[
+    GestureEvent(type=..., hand="left"/"right")
+]
+
+----------------------------------------
+Event Types
+----------------------------------------
+
+Pinch:
+    PINCH_START
+    PINCH_END
+
+Swipe (4 directions):
+    SWIPE_LEFT
+    SWIPE_RIGHT
+    SWIPE_UP
+    SWIPE_DOWN
+
+Click:
+    LEFT_CLICK
+    RIGHT_CLICK
+
+Scroll:
+    SCROLL_START
+    SCROLL_END
+
+Zoom:
+    ZOOM_START_PINKY_UP
+    ZOOM_END_PINKY_UP
+    ZOOM_START_NO_PINKY
+    ZOOM_END_NO_PINKY
+
+----------------------------------------
+Event Meaning
+----------------------------------------
+
+Events represent transitions, not states.
+
+Examples:
+- PINCH_START → pinch became active
+- LEFT_CLICK → index went down from hover posture
+- SWIPE_LEFT → sufficient motion detected in window
+- ZOOM_START → zoom regime entered
+
+Events exist only for one frame.
+
+----------------------------------------
+7. Signals vs Events
+----------------------------------------
+
+Signals:
+    "what is true right now"
+
+Events:
+    "what just happened"
+
+Example:
+    pinching = True  → signal
+    PINCH_START      → event
+
+----------------------------------------
+8. Internal Memory (Temporal State)
+----------------------------------------
+
+The detector does NOT store frames.
+
+It stores small temporal memory:
+
+- previous pinch state
+- previous hover posture
+- previous finger states (index/middle)
+- previous pointer position
+- previous thumb-index distance
+- swipe motion history (time window)
+- scroll active state
+- zoom active states
+
+Purpose:
+- compute deltas
+- detect transitions
+- stabilize gesture detection
+
+----------------------------------------
+9. Processing Pipeline (Conceptual)
+----------------------------------------
+
+For each frame:
+
+1. Extract hands
+2. Compute posture signals
+3. Compute motion/deltas
+4. Detect events (transitions)
+5. Build signals dict
+6. Update memory
+7. Return result
+
+----------------------------------------
+10. Role in System Architecture
+----------------------------------------
+
+GestureDetector DOES NOT:
+    - click UI elements
+    - scroll widgets
+    - manage app state
+
+It ONLY:
+    - interprets gestures
+    - provides signals + events
+
+Next layer (controller / state manager):
+    - decides if a widget is hovered
+    - applies click / scroll / drag
+    - handles UI logic
+
+----------------------------------------
+11. One-Line Summary
+----------------------------------------
+
+GestureDetector returns:
+
+    "what hands I see, what is true now, and what just happened"
+"""
