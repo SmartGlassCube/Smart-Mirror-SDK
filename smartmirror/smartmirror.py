@@ -31,7 +31,7 @@ class SmartMirrorServer:
         
         self.hardware = hardware or HAL.HAL()
         self.state_manager = state_manager or StateManager.StateManager()
-        self.gesture_detector = gesture_detector or GestureDetector.GestureDetector()
+        self.gesture_detector = gesture_detector or GestureDetector()
         self.ws_port = ws_port
         self.graph = graph
         self.assistant = assistant
