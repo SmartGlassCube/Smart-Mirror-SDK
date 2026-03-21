@@ -17,11 +17,16 @@ type MirrorWidget = {
   position?: Position
   content?: string
   data?: Record<string, unknown>
+  metadata?: Record<string, unknown>
 }
 
 type MirrorState = {
   nodeId: string | null
   widgets: MirrorWidget[]
+  nodes?: Array<{
+    id: string | null
+    widgets: MirrorWidget[]
+  }>
 }
 
 type BackendMessage = {
@@ -30,7 +35,7 @@ type BackendMessage = {
 }
 
 function App() {
-  const [state, setState] = useState<MirrorState>({ nodeId: null, widgets: [] })
+  const [state, setState] = useState<MirrorState>({ nodeId: null, widgets: [], nodes: [] })
 
   const onMessage = useCallback((message: BackendMessage) => {
     if ((message.type === 'INIT' || message.type === 'STATE_UPDATE') && message.state) {
@@ -74,13 +79,32 @@ function App() {
     )
   }
 
+  const nodes = state.nodes ?? []
+  const pages = nodes.length > 0
+    ? nodes
+    : [{ id: state.nodeId, widgets: state.widgets }]
+  const activePageIndex = pages.findIndex((page) => page.id === state.nodeId)
+
   return (
     <div className="mirror-canvas">
       <div className="mirror-status">
         {isConnected ? 'Connected to backend' : 'Connecting to backend...'}
         {state.nodeId ? ` | Node: ${state.nodeId}` : ''}
+        {pages.length > 0 ? ` | Page: ${(activePageIndex >= 0 ? activePageIndex : 0) + 1}/${pages.length}` : ''}
       </div>
-      {state.widgets.map(renderWidget)}
+      {pages.map((page, pageIndex) => {
+        const pageId = page.id ?? `page-${pageIndex}`
+        const isActive = page.id === state.nodeId || (!state.nodeId && pageIndex === 0)
+
+        return (
+          <div
+            key={pageId}
+            className={`mirror-page ${isActive ? 'mirror-page--active' : 'mirror-page--inactive'}`}
+          >
+            {isActive ? page.widgets.map(renderWidget) : null}
+          </div>
+        )
+      })}
     </div>
   )
 }

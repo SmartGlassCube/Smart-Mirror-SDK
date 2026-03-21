@@ -14,6 +14,19 @@
   opacity: 0.8;
 }
 
+.mirror-page {
+  position: absolute;
+  inset: 0;
+}
+
+.mirror-page--active {
+  display: block;
+}
+
+.mirror-page--inactive {
+  display: none;
+}
+
 .widget-slot {
   position: absolute;
   transform: translate(-50%, -50%);
