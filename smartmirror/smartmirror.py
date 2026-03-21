@@ -1,6 +1,6 @@
-from .hal import HAL
+from .hal.hal import HAL
 from .cv import GestureDetector
-from .config import StateManager
+from .config.state_manager import StateManager
 
 import asyncio
 import inspect
@@ -29,8 +29,8 @@ class SmartMirrorServer:
                   ui_host = "localhost",
                   ui_port = 5173):
         
-        self.hardware = hardware or HAL.HAL()
-        self.state_manager = state_manager or StateManager.StateManager()
+        self.hardware = hardware or HAL()
+        self.state_manager = state_manager or StateManager()
         self.gesture_detector = gesture_detector or GestureDetector()
         self.ws_port = ws_port
         self.graph = graph
@@ -62,7 +62,7 @@ class SmartMirrorServer:
     def _ensure_model(self) -> str:
         """Download and return path to hand landmarker model."""
         
-        model_path = "hand_landmarker.task"
+        model_path = "./cv/hand_landmarker.task"
         if not os.path.exists(model_path):
             url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
             urllib.request.urlretrieve(url, model_path)
