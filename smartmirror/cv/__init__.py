@@ -10,5 +10,6 @@ from .gestures import (
 	ScrollGesture,
 	ZoomGesture,
 	SwipeGesture,
+	TwoFingersSwipeGesture,
 	default_gesture_set,
 )

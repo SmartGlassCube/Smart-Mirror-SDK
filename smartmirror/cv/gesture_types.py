@@ -15,6 +15,11 @@ class GestureType(Enum):
     SWIPE_UP = "swipe_up"
     SWIPE_DOWN = "swipe_down"
 
+    TWO_FINGERS_SWIPE_LEFT = "two_fingers_swipe_left"
+    TWO_FINGERS_SWIPE_RIGHT = "two_fingers_swipe_right"
+    TWO_FINGERS_SWIPE_UP = "two_fingers_swipe_up"
+    TWO_FINGERS_SWIPE_DOWN = "two_fingers_swipe_down"
+
     LEFT_CLICK = "left_click"
     RIGHT_CLICK = "right_click"
 
