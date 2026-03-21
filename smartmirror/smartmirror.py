@@ -1,6 +1,6 @@
-from .hal.hal import HAL
+from .hal import HAL
 from .cv import GestureDetector
-from .config.state_manager import StateManager
+from .config import StateManager
 
 import asyncio
 import inspect
