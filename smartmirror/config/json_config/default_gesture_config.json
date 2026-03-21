@@ -1,0 +1,8 @@
+{
+  "target_radius": 0.35,
+  "swipe_cooldown": 0.30,
+  "scroll_cooldown": 0.25,
+  "node_navigation_cooldown": 0.80,
+  "scroll_velocity_threshold": 0.03,
+  "allow_unmatched_single_edge_navigation": false
+}

@@ -1,0 +1,40 @@
+{
+  "swipe_left": {
+    "handler": "_handle_widget_navigation",
+    "horizontal_steps": 1,
+    "vertical_steps": 0,
+    "cooldown_key": "horizontal",
+    "cooldown_config": "swipe_cooldown"
+  },
+  "swipe_right": {
+    "handler": "_handle_widget_navigation",
+    "horizontal_steps": -1,
+    "vertical_steps": 0,
+    "cooldown_key": "horizontal",
+    "cooldown_config": "swipe_cooldown"
+  },
+  "swipe_up": {
+    "handler": "_handle_widget_navigation",
+    "horizontal_steps": 0,
+    "vertical_steps": -1,
+    "cooldown_key": "vertical",
+    "cooldown_config": "swipe_cooldown"
+  },
+  "swipe_down": {
+    "handler": "_handle_widget_navigation",
+    "horizontal_steps": 0,
+    "vertical_steps": 1,
+    "cooldown_key": "vertical",
+    "cooldown_config": "swipe_cooldown"
+  },
+  "scroll_start": {
+    "handler": "_handle_widget_scroll",
+    "cooldown_key": "vertical",
+    "cooldown_config": "scroll_cooldown"
+  },
+  "scroll_update": {
+    "handler": "_handle_widget_scroll",
+    "cooldown_key": "vertical",
+    "cooldown_config": "scroll_cooldown"
+  }
+}
