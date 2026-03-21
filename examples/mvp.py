@@ -1,6 +1,7 @@
 from smartmirror.smartmirror import SmartMirrorServer
 from smartmirror.ui import WeatherWidget, CalendarWidget, NewsWidget, TextWidget, QRCodeGalleryWidget
 from smartmirror.runtime.data_providers import QRCodeCatalogProvider, MongoCalendarProvider
+from smartmirror.config.state_manager import StateManager
 
 import asyncio
 import os
@@ -64,7 +65,17 @@ if __name__ == "__main__":
     news = NewsWidget(position={"x": 0.1, "y": 0.5}, content="Static news placeholder")
     text = TextWidget(
         position={"x": 0.5, "y": 0.5},
-        content="Welcome to Smart Mirror!"
+        content={
+            "home": [
+                "Welcome to Smart Mirror!",
+                "Swipe left/right for text items",
+                "Scroll up/down for sections",
+            ],
+            "focus": [
+                "Focus mode activated",
+                "Use two fingers and swipe right to go back",
+            ],
+        },
     )
     qr_gallery = QRCodeGalleryWidget(
         position={"x": 0.8, "y": 0.5},
@@ -73,17 +84,50 @@ if __name__ == "__main__":
         refresh_interval=120,
     )
 
+    focus_text = TextWidget(
+        position={"x": 0.5, "y": 0.45},
+        content=[
+            "Focus board",
+            "Main objective: ship gesture UX",
+            "Keep hand posture steady for reliable input",
+        ],
+    )
+
     graph = {
         "nodes": [
-            {"id": "root", "widgets": [weather, calendar, news, text, qr_gallery]}
+            {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery]},
+            {"id": "focus", "widgets": [focus_text]},
         ],
-        "edges": []
+        "edges": [
+            {
+                "from": "home",
+                "to": "focus",
+                "gesture": "two_fingers_swipe_left",
+            },
+            {
+                "from": "focus",
+                "to": "home",
+                "gesture": "two_fingers_swipe_right",
+            },
+        ],
     }
+
+    state_manager = StateManager(
+        graph=graph,
+        initial_node_id="home",
+        gesture_config={
+            "target_radius": 0.40,
+            "swipe_cooldown": 0.25,
+            "scroll_cooldown": 0.20,
+            "node_navigation_cooldown": 0.80,
+        },
+    )
 
     server = SmartMirrorServer(
         graph=graph,
+        state_manager=state_manager,
         with_ui=True,
-        with_camera=False,
+        with_camera=True,
         with_microphone=False,
         assistant=None,
         edit_gesture=None,

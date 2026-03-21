@@ -19,6 +19,24 @@ This module detects hand-based gestures from camera frames.
 - `smartmirror/cv/gestures/scroll.py`
 - `smartmirror/cv/gestures/zoom.py`
 - `smartmirror/cv/gestures/swipe.py`
+- `smartmirror/cv/gestures/two_fingers_swipe.py`
+
+## Two-fingers node navigation
+
+`TwoFingersSwipeGesture` emits:
+
+- `TWO_FINGERS_SWIPE_LEFT`
+- `TWO_FINGERS_SWIPE_RIGHT`
+- `TWO_FINGERS_SWIPE_UP`
+- `TWO_FINGERS_SWIPE_DOWN`
+
+Detection conditions:
+
+- exactly one hand detected
+- index + middle fingers up (`hover_posture`) and not pinching
+- palm-pointer movement crosses swipe threshold
+
+Use these events in graph edges via `gesture` or `trigger` fields.
 
 ## How to add a new gesture smoothly
 

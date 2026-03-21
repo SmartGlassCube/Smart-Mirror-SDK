@@ -4,6 +4,7 @@ from .config.state_manager import StateManager
 
 import asyncio
 import inspect
+import cv2
 from pathlib import Path
 import os
 import urllib.request
@@ -27,10 +28,11 @@ class SmartMirrorServer:
                   with_ui = True,
                   ui_dir = None,
                   ui_host = "localhost",
-                  ui_port = 5173):
+                  ui_port = 5173,
+                  camera_id = 0):
         
         self.hardware = hardware or HAL()
-        self.state_manager = state_manager or StateManager()
+        self.state_manager = state_manager or StateManager(graph=graph)
         self.gesture_detector = gesture_detector or GestureDetector()
         self.ws_port = ws_port
         self.graph = graph
@@ -42,6 +44,7 @@ class SmartMirrorServer:
         self.ui_port = ui_port
         self.ui_dir = Path(ui_dir) if ui_dir else self._get_default_ui_dir()
         self.ui_process = None
+        self.camera_id = camera_id
 
         self.edit_gesture = edit_gesture
 
@@ -61,12 +64,13 @@ class SmartMirrorServer:
     # can be replaced
     def _ensure_model(self) -> str:
         """Download and return path to hand landmarker model."""
-        
-        model_path = "./cv/hand_landmarker.task"
-        if not os.path.exists(model_path):
+        model_path = Path(__file__).resolve().parent / "cv" / "hand_landmarker.task"
+        model_path.parent.mkdir(parents=True, exist_ok=True)
+
+        if not model_path.exists():
             url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
-            urllib.request.urlretrieve(url, model_path)
-        return model_path
+            urllib.request.urlretrieve(url, str(model_path))
+        return str(model_path)
 
     def _get_default_ui_dir(self) -> Path:
         return Path(__file__).resolve().parent.parent / "ui"
@@ -231,59 +235,63 @@ class SmartMirrorServer:
             })
 
     async def camera_loop(self):
-        """Main camera processing loop."""
-        # cap = cv2.VideoCapture(self.camera_id)
-        
-        # if not cap.isOpened():
-        #     print(f"[ERROR] Could not open camera {self.camera_id}")
-        #     return
-        
-        # print(f"[Camera] Started capture from camera {self.camera_id}")
-        
-        # # Set camera properties for better performance
-        # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        # cap.set(cv2.CAP_PROP_FPS, 30)
-        
-        # self.running = True
-        # frame_count = 0
-        
-        # try:
-        #     while self.running:
-        #         ret, frame = cap.read()
-        #         if not ret:
-        #             print("[Camera] Failed to read frame")
-        #             await asyncio.sleep(0.1)
-        #             continue
-                
-        #         # Mirror the frame for more intuitive interaction
-        #         frame = cv2.flip(frame, 1)
-                
-        #         # Process frame and get events
-        #         events = self.process_frame(frame)
-                
-        #         # Broadcast events
-        #         for event in events:
-        #             await self.broadcast(event)
-                
-        #         # Show debug window
-        #         if self.show_debug_window:
-        #             cv2.imshow("Smart Mirror - Debug", frame)
-        #             key = cv2.waitKey(1) & 0xFF
-        #             if key == ord('q'):
-        #                 self.running = False
-        #             elif key == ord('d'):
-        #                 # Toggle debug window
-        #                 self.show_debug_window = not self.show_debug_window
-                
-        #         frame_count += 1
-                
-        #         # Small delay to prevent CPU overload
-        #         await asyncio.sleep(0.01)
-                
-        while self.running:
-            await self._refresh_widget_data()
-            await asyncio.sleep(self.widget_update_tick)
+        if not self.with_camera:
+            while self.running:
+                await self._refresh_widget_data()
+                await asyncio.sleep(self.widget_update_tick)
+            return
+
+        cap = cv2.VideoCapture(self.camera_id)
+        if not cap.isOpened():
+            print(f"[Camera] Could not open camera {self.camera_id}; running in data-only mode")
+            while self.running:
+                await self._refresh_widget_data()
+                await asyncio.sleep(self.widget_update_tick)
+            return
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+
+        last_widget_refresh = 0.0
+
+        try:
+            while self.running:
+                ret, frame = cap.read()
+                if not ret:
+                    await asyncio.sleep(0.02)
+                    continue
+
+                frame = cv2.flip(frame, 1)
+                detector_output = self.gesture_detector.process_frame(frame)
+
+                if self.state_manager.handle_gesture_events(
+                    events=detector_output.get("events", []),
+                    signals=detector_output.get("signals", {}),
+                ):
+                    await self.broadcast(
+                        {
+                            "type": "STATE_UPDATE",
+                            "state": self.state_manager.get_state_snapshot(),
+                        }
+                    )
+
+                now = time.time()
+                if now - last_widget_refresh >= self.widget_update_tick:
+                    await self._refresh_widget_data()
+                    last_widget_refresh = now
+
+                if self.show_debug_window and self.gesture_detector.debug:
+                    cv2.imshow("Smart Mirror - Debug", frame)
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord("q"):
+                        self.running = False
+
+                await asyncio.sleep(0.01)
+        finally:
+            cap.release()
+            if self.gesture_detector.debug:
+                cv2.destroyAllWindows()
     
     async def run(self):
         """Start the server."""
