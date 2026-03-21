@@ -54,19 +54,19 @@ if __name__ == "__main__":
         }
     )
 
-    weather = WeatherWidget.WeatherWidget(position={"x": 0.1, "y": 0.2}, content="Static weather placeholder")
-    calendar = CalendarWidget.CalendarWidget(
+    weather = WeatherWidget(position={"x": 0.1, "y": 0.2}, content="Static weather placeholder")
+    calendar = CalendarWidget(
         position={"x": 0.5, "y": 0.2},
         content=calendar_content,
         data_provider=calendar_provider,
         refresh_interval=60,
     )
-    news = NewsWidget.NewsWidget(position={"x": 0.1, "y": 0.5}, content="Static news placeholder")
-    text = TextWidget.TextWidget(
+    news = NewsWidget(position={"x": 0.1, "y": 0.5}, content="Static news placeholder")
+    text = TextWidget(
         position={"x": 0.5, "y": 0.5},
         content="Welcome to Smart Mirror!"
     )
-    qr_gallery = QRCodeGalleryWidget.QRCodeGalleryWidget(
+    qr_gallery = QRCodeGalleryWidget(
         position={"x": 0.8, "y": 0.5},
         content="QR links by category",
         data_provider=qr_provider,
