@@ -33,6 +33,7 @@ class SmartMirrorServer:
         
         self.hardware = hardware or HAL()
         self.state_manager = state_manager or StateManager(graph=graph)
+        self.model_path = self._ensure_model()
         self.gesture_detector = gesture_detector or GestureDetector()
         self.ws_port = ws_port
         self.graph = graph
@@ -49,8 +50,6 @@ class SmartMirrorServer:
         self.edit_gesture = edit_gesture
 
         self.state_manager.set_graph(self.graph)
-
-        self.model_path = self._ensure_model()
 
         self.clients = set()
 
@@ -90,8 +89,9 @@ class SmartMirrorServer:
             return True
 
         print("[UI] Installing UI dependencies (npm install)...")
+        npm_bin = shutil.which("npm") or "npm"
         install_process = await asyncio.create_subprocess_exec(
-            "npm",
+            npm_bin,
             "install",
             cwd=str(self.ui_dir),
         )
@@ -110,8 +110,9 @@ class SmartMirrorServer:
             return
 
         print(f"[UI] Starting UI on http://{self.ui_host}:{self.ui_port}")
+        npm_bin = shutil.which("npm") or "npm"
         self.ui_process = await asyncio.create_subprocess_exec(
-            "npm",
+            npm_bin,
             "run",
             "dev",
             "--",

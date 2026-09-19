@@ -36,5 +36,14 @@
     "handler": "_handle_widget_scroll",
     "cooldown_key": "vertical",
     "cooldown_config": "scroll_cooldown"
+  },
+  "pinch_start": {
+    "handler": "_handle_widget_drag_start"
+  },
+  "pinch_move": {
+    "handler": "_handle_widget_drag_move"
+  },
+  "pinch_end": {
+    "handler": "_handle_widget_drag_end"
   }
 }

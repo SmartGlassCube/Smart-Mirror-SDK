@@ -31,6 +31,7 @@ class StateManager:
 
         self.edge_gesture_fields = tuple(edge_gesture_fields or ("gesture", "trigger", "event"))
         self._last_event_times = {}
+        self._dragging = {"left": None, "right": None}
 
     @classmethod
     def _load_json_config(cls, file_path):
@@ -215,6 +216,51 @@ class StateManager:
 
         vertical_steps = 1 if velocity_y > 0 else -1
         return bool(widget.apply_navigation(horizontal_steps=0, vertical_steps=vertical_steps))
+
+    def _handle_widget_drag_start(self, widget, event, binding):
+        """Lock onto the nearest widget when a pinch begins."""
+        hand = getattr(event, "hand", None)
+        if hand is None or widget is None:
+            return False
+        self._dragging[hand] = widget
+        widget._is_dragging = True
+        return True
+
+    def _handle_widget_drag_move(self, widget, event, binding):
+        """Move the dragged widget by the pinch delta."""
+        hand = getattr(event, "hand", None)
+        if hand is None:
+            return False
+
+        target = self._dragging.get(hand)
+        if target is None:
+            return False
+
+        data = getattr(event, "data", None) or {}
+        dx = data.get("dx", 0.0)
+        dy = data.get("dy", 0.0)
+
+        position = getattr(target, "position", None)
+        if position is None:
+            return False
+
+        new_x = max(0.0, min(1.0, position.get("x", 0.5) + dx))
+        new_y = max(0.0, min(1.0, position.get("y", 0.5) + dy))
+        target.position["x"] = new_x
+        target.position["y"] = new_y
+        return True
+
+    def _handle_widget_drag_end(self, widget, event, binding):
+        """Release the dragged widget when the pinch ends."""
+        hand = getattr(event, "hand", None)
+        if hand is None:
+            return False
+
+        target = self._dragging.get(hand)
+        if target is not None:
+            target._is_dragging = False
+        self._dragging[hand] = None
+        return True
 
     def _resolve_widget_for_event(self, event):
         widgets = [

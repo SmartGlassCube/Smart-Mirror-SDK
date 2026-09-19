@@ -41,7 +41,19 @@ class LandmarkDetector:
         min_tracking_confidence: float = 0.5,
     ):
         if model_path is None:
-            model_path = str(Path(__file__).resolve().parent / "hand_landmarker.task")
+            model_path_obj = Path(__file__).resolve().parent / "hand_landmarker.task"
+        else:
+            model_path_obj = Path(model_path)
+
+        if not model_path_obj.exists():
+            print(f"[CV] Downloading MediaPipe hand landmarker model to {model_path_obj}...")
+            import urllib.request
+            model_path_obj.parent.mkdir(parents=True, exist_ok=True)
+            url = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+            urllib.request.urlretrieve(url, str(model_path_obj))
+            print("[CV] Model downloaded successfully.")
+
+        model_path = str(model_path_obj)
 
         base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.HandLandmarkerOptions(

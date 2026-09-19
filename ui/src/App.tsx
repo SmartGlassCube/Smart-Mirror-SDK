@@ -18,6 +18,7 @@ type MirrorWidget = {
   content?: string
   data?: Record<string, unknown>
   metadata?: Record<string, unknown>
+  dragging?: boolean
 }
 
 type MirrorState = {
@@ -72,8 +73,10 @@ function App() {
       return null
     }
 
+    const draggingClass = widget.dragging ? 'widget-slot--dragging' : ''
+
     return (
-      <div key={`${widget.type}-${index}`} className="widget-slot" style={style}>
+      <div key={`${widget.type}-${index}`} className={`widget-slot ${draggingClass}`} style={style}>
         {component}
       </div>
     )

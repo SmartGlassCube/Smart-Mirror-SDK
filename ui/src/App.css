@@ -30,6 +30,14 @@
 .widget-slot {
   position: absolute;
   transform: translate(-50%, -50%);
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+.widget-slot--dragging {
+  z-index: 100;
+  transform: translate(-50%, -50%) scale(1.05);
+  filter: drop-shadow(0 0 12px rgba(0, 200, 255, 0.7));
+  transition: none;
 }
 
 .widget {
@@ -39,4 +47,8 @@
   border: 1px solid #555;
   border-radius: 8px;
   background: rgba(0, 0, 0, 0.45);
+}
+
+.widget-slot--dragging .widget {
+  border-color: rgba(0, 200, 255, 0.6);
 }

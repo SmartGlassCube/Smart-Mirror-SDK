@@ -19,6 +19,7 @@ class BaseWidget:
         self.refresh_interval = refresh_interval
         self.metadata = metadata or {}
         self._last_data_update = 0.0
+        self._is_dragging = False
 
     def handle_gesture(self, _event):
         return False
@@ -31,4 +32,6 @@ class BaseWidget:
             "content": self.content,
             "data": self.data,
             "metadata": self.metadata,
+            "dragging": self._is_dragging,
         }
+
