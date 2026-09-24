@@ -1,0 +1,4 @@
+The Smart Mirror SDK is a IEEE INSAT project that builds a local-first
+smart mirror operating system. It combines gesture-based navigation, a
+WebSocket-driven UI, and a voice assistant. This is placeholder content
+for phase 1 retrieval testing; replace with real project notes later.
