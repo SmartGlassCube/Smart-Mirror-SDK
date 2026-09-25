@@ -1,13 +1,20 @@
-from smartmirror.smartmirror import SmartMirrorServer
-from smartmirror.ui import WeatherWidget, CalendarWidget, NewsWidget, TextWidget, QRCodeGalleryWidget
-from smartmirror.runtime.data_providers import QRCodeCatalogProvider, MongoCalendarProvider
-from smartmirror.config.state_manager import StateManager
-
 import asyncio
 import os
 
+from smartmirror.core import StateManager
+from smartmirror.server import SmartMirrorServer
+from smartmirror.widgets import CalendarWidget, NewsWidget, QRGalleryWidget, TextWidget, WeatherWidget
+from smartmirror.widgets.providers import MongoCalendarProvider, QRCodeCatalogProvider
 
-def fallback_calendar_provider(_widget=None):
+try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
+
+def fallback_calendar_provider():
     return {
         "events": [
             {"title": "Standup", "start": "2026-03-15T09:00:00"},
@@ -77,7 +84,7 @@ if __name__ == "__main__":
             ],
         },
     )
-    qr_gallery = QRCodeGalleryWidget(
+    qr_gallery = QRGalleryWidget(
         position={"x": 0.8, "y": 0.5},
         content="QR links by category",
         data_provider=qr_provider,
@@ -123,13 +130,5 @@ if __name__ == "__main__":
         },
     )
 
-    server = SmartMirrorServer(
-        graph=graph,
-        state_manager=state_manager,
-        with_ui=True,
-        with_camera=True,
-        with_microphone=False,
-        assistant=None,
-        edit_gesture=None,
-    )
+    server = SmartMirrorServer(state_manager=state_manager, with_frontend=True, with_camera=True)
     asyncio.run(server.run())
