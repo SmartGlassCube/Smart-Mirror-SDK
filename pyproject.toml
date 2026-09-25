@@ -35,6 +35,7 @@ data = [
 ]
 assistant = [
   "openai>=1.0.0",
+  "anthropic>=0.30.0",
   "qdrant-client>=1.9.0",
   "sentence-transformers>=3.0.0"
 ]

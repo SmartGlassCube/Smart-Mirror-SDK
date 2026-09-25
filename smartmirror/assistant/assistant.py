@@ -6,7 +6,7 @@ list) happens exclusively in `_build_prompt` below. `rag/` and `llm/` must
 never import from each other.
 """
 
-from .llm import LLMClient
+from .llm import LLMBackend, LLMClient, OpenAICompatBackend
 from .rag import Chunker, Embedder, Retriever, VectorStore
 from .stt import WhisperSTT
 from .tts import PiperTTS
@@ -25,7 +25,8 @@ class Assistant:
 
     def __init__(
         self,
-        api_key,
+        llm: LLMBackend = None,
+        api_key=None,
         url=None,
         model="gpt-4o-mini",
         documents=None,
@@ -38,7 +39,10 @@ class Assistant:
         self.language = language
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 
-        self.llm = LLMClient(api_key=api_key, base_url=url, model=model)
+        backend = llm or (OpenAICompatBackend(api_key=api_key, base_url=url, model=model) if api_key else None)
+        if backend is None:
+            raise ValueError("Assistant requires either llm=<LLMBackend instance> or api_key=<str>")
+        self.llm = LLMClient(backend)
 
         self.chunker = Chunker()
         self.embedder = Embedder()
@@ -67,8 +71,7 @@ class Assistant:
         retrieved_chunks = self.retriever.retrieve(message)
         messages = self._build_prompt(message, retrieved_chunks)
 
-        response = self.llm.complete(messages, tools=self.tool_manager.specs() or None)
-        reply = response["content"]
+        reply = self.llm.complete(messages, tools=self.tool_manager.specs() or None)
 
         self.history.append({"role": "user", "content": message})
         self.history.append({"role": "assistant", "content": reply})

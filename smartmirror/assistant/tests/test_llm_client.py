@@ -1,38 +1,30 @@
-from unittest.mock import patch
-
 from smartmirror.assistant.llm import LLMClient
 
 
-def test_complete_returns_content_and_tool_calls(fake_llm_response):
-    fake_response = fake_llm_response("Hello from the model")
+def test_complete_delegates_to_backend(fake_backend):
+    backend = fake_backend(reply="delegated reply")
+    client = LLMClient(backend)
 
-    with patch(
-        "openai.resources.chat.completions.completions.Completions.create",
-        return_value=fake_response,
-    ) as mock_create:
-        client = LLMClient(api_key="sk-test", model="gpt-4o-mini")
-        result = client.complete([{"role": "user", "content": "hi"}])
+    result = client.complete([{"role": "user", "content": "hi"}])
 
-    assert result == {"content": "Hello from the model", "tool_calls": []}
-    assert mock_create.call_args.kwargs["model"] == "gpt-4o-mini"
-    assert mock_create.call_args.kwargs["messages"] == [{"role": "user", "content": "hi"}]
-    assert "tools" not in mock_create.call_args.kwargs
+    assert result == "delegated reply"
+    assert backend.calls == [{"messages": [{"role": "user", "content": "hi"}], "tools": None}]
 
 
-def test_complete_passes_tools_through_when_given(fake_llm_response):
-    fake_response = fake_llm_response("ok")
+def test_complete_passes_tools_through_to_backend(fake_backend):
+    backend = fake_backend()
+    client = LLMClient(backend)
     tool_specs = [{"type": "function", "function": {"name": "noop"}}]
 
-    with patch(
-        "openai.resources.chat.completions.completions.Completions.create",
-        return_value=fake_response,
-    ) as mock_create:
-        client = LLMClient(api_key="sk-test")
-        client.complete([{"role": "user", "content": "hi"}], tools=tool_specs)
+    client.complete([{"role": "user", "content": "hi"}], tools=tool_specs)
 
-    assert mock_create.call_args.kwargs["tools"] == tool_specs
+    assert backend.calls[0]["tools"] == tool_specs
 
 
-def test_complete_respects_base_url():
-    client = LLMClient(api_key="sk-test", base_url="http://localhost:8000/v1")
-    assert str(client._client.base_url) == "http://localhost:8000/v1/"
+def test_client_holds_no_provider_logic_of_its_own(fake_backend):
+    """LLMClient must be a pure pass-through -- swapping backends is all it does."""
+    backend_a = fake_backend(reply="from A")
+    backend_b = fake_backend(reply="from B")
+
+    assert LLMClient(backend_a).complete([]) == "from A"
+    assert LLMClient(backend_b).complete([]) == "from B"

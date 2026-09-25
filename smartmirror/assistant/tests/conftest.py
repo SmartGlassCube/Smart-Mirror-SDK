@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from smartmirror.assistant.llm import LLMBackend
 from smartmirror.assistant.rag import Embedder
 
 SEED_CORPUS = Path(__file__).resolve().parents[1] / "rag" / "seed_corpus"
@@ -32,3 +33,20 @@ def make_fake_openai_response(content: str):
 @pytest.fixture
 def fake_llm_response():
     return make_fake_openai_response
+
+
+class FakeLLMBackend(LLMBackend):
+    """An in-memory LLMBackend for testing Assistant without any network I/O."""
+
+    def __init__(self, reply: str = "stub reply"):
+        self.reply = reply
+        self.calls: list[dict] = []
+
+    def complete(self, messages, tools=None) -> str:
+        self.calls.append({"messages": messages, "tools": tools})
+        return self.reply
+
+
+@pytest.fixture
+def fake_backend():
+    return FakeLLMBackend
