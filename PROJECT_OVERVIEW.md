@@ -65,6 +65,7 @@ Smart-Mirror-SDK/
 │   │   ├── calendar.py  weather.py  news.py  qr_gallery.py  games.py  events.py
 │   │   └── providers/            # Widget data sources
 │   │       ├── mongo_calendar.py # MongoCalendarProvider
+│   │       ├── open_meteo.py     # OpenMeteoWeatherProvider
 │   │       └── qr_catalog.py     # QRCodeCatalogProvider
 │   ├── hal/hal.py                # Hardware abstraction layer (stub)
 │   └── assistant/assistant.py    # Voice assistant (stub)
@@ -244,13 +245,14 @@ Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` 
 | `QRGalleryWidget` | `qr_gallery` | Expects `data = {"categories": {name: [{title, imageUrl, url}]}}` |
 | `GamesWidget` | `games` | Tiles for computer-vision games: `GamesWidget(games=[{id, title, icon}])`, `icon` an optional image URL |
 | `EventsWidget` | `events` | Cards for club events/projects: `EventsWidget(items=[{id, name, description, image}])`, or a `data_provider` returning `{"items": [...]}` |
-| `WeatherWidget` | `weather` | Placeholder |
+| `WeatherWidget` | `weather` | Current weather with a pixel icon; use `data_provider=OpenMeteoWeatherProvider(...)` |
 | `NewsWidget` | `news` | Placeholder |
 
 ### 6.2 Data providers (`smartmirror/widgets/providers`)
 A data provider is any callable, sync or async, with the signature `provider(widget)` or `provider()`. The server calls it every `refresh_interval` seconds and stores the result in `widget.data`. Built-in providers:
 - `MongoCalendarProvider(uri, database, collection, query, ...)` returns `{"events": [...]}`, with datetimes converted to ISO strings.
 - `QRCodeCatalogProvider(categories)` returns `{"categories": ...}`.
+- `OpenMeteoWeatherProvider(latitude, longitude, city)` returns the current weather from Open-Meteo (no API key): `{"city", "temperature", "humidity", "wind", "code", "isDay"}`.
 
 ---
 

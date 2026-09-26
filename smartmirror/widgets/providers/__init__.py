@@ -6,6 +6,7 @@ and returning the new `widget.data`. The server calls it every
 """
 
 from .mongo_calendar import MongoCalendarProvider
+from .open_meteo import OpenMeteoWeatherProvider
 from .qr_catalog import QRCodeCatalogProvider
 
-__all__ = ["MongoCalendarProvider", "QRCodeCatalogProvider"]
+__all__ = ["MongoCalendarProvider", "OpenMeteoWeatherProvider", "QRCodeCatalogProvider"]

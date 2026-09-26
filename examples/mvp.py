@@ -12,7 +12,7 @@ from smartmirror.widgets import (
     TextWidget,
     WeatherWidget,
 )
-from smartmirror.widgets.providers import MongoCalendarProvider, QRCodeCatalogProvider
+from smartmirror.widgets.providers import MongoCalendarProvider, OpenMeteoWeatherProvider, QRCodeCatalogProvider
 
 try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
     from dotenv import load_dotenv
@@ -65,7 +65,12 @@ if __name__ == "__main__":
         }
     )
 
-    weather = WeatherWidget(position={"x": 0.1, "y": 0.2}, content="Static weather placeholder")
+    # Live weather for Tunis from Open-Meteo (free, no API key), refreshed every 10 minutes.
+    weather = WeatherWidget(
+        position={"x": 0.1, "y": 0.2},
+        data_provider=OpenMeteoWeatherProvider(city="Tunis", latitude=36.8065, longitude=10.1815),
+        refresh_interval=600,
+    )
     calendar = CalendarWidget(
         position={"x": 0.5, "y": 0.2},
         content=calendar_content,

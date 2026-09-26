@@ -148,3 +148,23 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+.weather-now {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--px) * 3);
+  margin-bottom: calc(var(--px) * 2);
+}
+
+/* 20x20 pixel icon at 3x: whole-number scale keeps every pixel square. */
+.weather-now__icon {
+  width: 60px;
+  height: 60px;
+}
+
+.weather-now__temperature {
+  font-family: var(--font-pixel-title);
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--px-orange);
+}
