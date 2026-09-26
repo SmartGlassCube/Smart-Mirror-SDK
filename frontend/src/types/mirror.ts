@@ -48,3 +48,5 @@ export type BackendMessage =
   | { type: 'POINTER'; position: PointerPosition | null }
   // Someone talked to the chatbot: wakes Abdo (see assistant/Abdo.tsx).
   | { type: 'ASSISTANT_WAKE' }
+  // Chatbot reply: wakes Abdo and types `text` into his speech bubble.
+  | { type: 'ASSISTANT_SAY'; text: string }

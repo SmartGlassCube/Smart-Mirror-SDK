@@ -1,11 +1,17 @@
-/* Pinned to the bottom center; never moves, never takes input. */
+/* Shared by Abdo and his speech bubble, which is positioned relative to him. */
+:root {
+  --abdo-size: 300px;
+  --abdo-bottom: calc(var(--px) * 1);
+}
+
+/* Pinned near the bottom center; never moves, never takes input. */
 .abdo {
   position: absolute;
-  bottom: 0;
+  bottom: var(--abdo-bottom);
   left: 50%;
   z-index: 5;
-  width: 220px;
-  height: 220px;
+  width: var(--abdo-size);
+  height: var(--abdo-size);
   transform: translateX(-50%);
   pointer-events: none;
 }
@@ -20,4 +26,14 @@
 /* Transition GIF is mounted hidden until decoded, so the sleeping GIF stays up meanwhile. */
 .abdo__img--loading {
   visibility: hidden;
+}
+
+/* Speech bubble*/
+.abdo-speech {
+  position: absolute;
+  bottom: calc(var(--abdo-bottom) + var(--abdo-size) / 2.5) ;
+  left: 49.8%;
+  z-index: 6;
+  transform: translate(-50%, 100%);
+  pointer-events: none;
 }

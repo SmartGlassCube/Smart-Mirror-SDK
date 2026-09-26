@@ -87,6 +87,15 @@ class SmartMirrorServer:
     def stop(self):
         self.running = False
 
+    # Hooks for the voice chatbot (RAG), shown by the Abdo avatar in the frontend.
+    def assistant_wake(self):
+        """Someone started talking to the chatbot: wake Abdo."""
+        self.hub.broadcast({"type": "ASSISTANT_WAKE"})
+
+    def assistant_say(self, text):
+        """Show a chatbot reply, typed out in Abdo's speech bubble."""
+        self.hub.broadcast({"type": "ASSISTANT_SAY", "text": text})
+
     async def _main_loop(self):
         capture = self._open_camera() if self.with_camera else None
         if capture is None:

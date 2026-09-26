@@ -7,6 +7,12 @@ import CameraPreview from './CameraPreview'
 import HandCursor, { type HandCursorHandle } from './HandCursor'
 import PageView from './PageView'
 
+// On a page change Abdo says the page name, for this long after it has finished typing.
+const PAGE_NAME_HOLD_MS = 2000
+
+// "mini_games" -> "MINI GAMES"
+const pageName = (nodeId: string) => nodeId.replace(/[_-]+/g, ' ').toUpperCase()
+
 function MirrorCanvas() {
   const [state, setState] = useState<MirrorState>({ nodeId: null, nodeIds: [], widgets: [] })
   const [cameraFrame, setCameraFrame] = useState<CameraFrame | null>(null)
@@ -21,12 +27,15 @@ function MirrorCanvas() {
       cursorRef.current?.move(message.position)
     } else if (message.type === 'ASSISTANT_WAKE') {
       abdoRef.current?.wake()
+    } else if (message.type === 'ASSISTANT_SAY') {
+      abdoRef.current?.say(message.text)
     } else {
-      // A page change wakes Abdo; the first page after startup doesn't.
+      // A page change wakes Abdo and he says the new page's name; the first page after startup doesn't.
       const previousNodeId = nodeIdRef.current
-      nodeIdRef.current = message.state.nodeId
-      if (previousNodeId !== null && previousNodeId !== message.state.nodeId) {
-        abdoRef.current?.wake()
+      const nodeId = message.state.nodeId
+      nodeIdRef.current = nodeId
+      if (previousNodeId !== null && nodeId !== null && previousNodeId !== nodeId) {
+        abdoRef.current?.say(pageName(nodeId), PAGE_NAME_HOLD_MS)
       }
       setState(message.state)
     }

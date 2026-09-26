@@ -14,6 +14,8 @@ class ClientHub:
         (see `HandPointer`); `None` when the hand is lost
       - `{"type": "ASSISTANT_WAKE"}`: someone talked to the chatbot; wakes the Abdo avatar
         (`hub.broadcast({"type": "ASSISTANT_WAKE"})`). Page changes wake it on their own.
+      - `{"type": "ASSISTANT_SAY", "text": "..."}`: chatbot reply; wakes Abdo and types the text
+        into his speech bubble, replacing whatever it showed.
     Client messages are only logged for now.
     """
 
