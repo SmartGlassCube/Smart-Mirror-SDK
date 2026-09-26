@@ -10,7 +10,9 @@
   top: 12px;
   left: 12px;
   z-index: 10;
-  font-size: 0.9rem;
+  font-family: var(--font-pixel-title);
+  font-size: 10px;
+  color: var(--px-silver);
   opacity: 0.8;
 }
 
@@ -26,13 +28,13 @@
 .camera-preview__image {
   display: block;
   width: 100%;
-  border: 1px solid #555;
-  border-radius: 8px;
+  border: var(--px) solid var(--px-purple);
+  image-rendering: pixelated;
 }
 
 .camera-preview__event {
-  font-size: 0.75rem;
-  color: rgb(255, 220, 50);
+  font-size: 18px;
+  color: var(--px-orange);
   text-align: right;
 }
 
@@ -49,11 +51,47 @@
 
 .widget-slot--dragging {
   z-index: 100;
-  transform: translate(-50%, -50%) scale(1.05);
-  filter: drop-shadow(0 0 12px rgba(0, 200, 255, 0.7));
   transition: none;
 }
 
-.widget-slot--dragging .widget {
-  border-color: rgba(0, 200, 255, 0.6);
+/* Pixel half circle resting on the widget's top border (see DragHandle.tsx). */
+.drag-handle {
+  position: absolute;
+  bottom: calc(100% + var(--px));
+  left: 50%;
+  /* 16x8 grid at 3px per pixel */
+  width: 48px;
+  height: 24px;
+  transform: translateX(-50%);
+}
+
+.drag-handle__outline {
+  fill: var(--px-silver);
+}
+
+.drag-handle__fill {
+  fill: var(--px-indigo);
+}
+
+.drag-handle__shine {
+  fill: var(--px-purple);
+}
+
+.drag-handle--lit {
+  filter: drop-shadow(0 0 6px var(--px-orange));
+  animation: drag-handle-blink 0.4s steps(2, jump-none) infinite alternate;
+}
+
+.drag-handle--lit .drag-handle__fill {
+  fill: var(--px-orange);
+}
+
+.drag-handle--lit .drag-handle__shine {
+  fill: var(--px-silver);
+}
+
+@keyframes drag-handle-blink {
+  to {
+    filter: drop-shadow(0 0 12px var(--px-orange));
+  }
 }

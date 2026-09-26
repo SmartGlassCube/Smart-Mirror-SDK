@@ -16,22 +16,9 @@ const CalendarWidget = ({ widget }: WidgetProps<CalendarData>) => {
       <h2>Calendar</h2>
       {widget.content ? <div>{widget.content}</div> : null}
       <div>{year} - {month + 1}</div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', width: 210 }}>
+      <div className="calendar-grid">
         {days.map(day => (
-          <div
-            key={day}
-            style={{
-              width: 30,
-              height: 30,
-              margin: 2,
-              background: day === today.getDate() ? '#4caf50' : '#eee',
-              color: day === today.getDate() ? '#fff' : '#333',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 4,
-            }}
-          >
+          <div key={day} className={`calendar-day${day === today.getDate() ? ' calendar-day--today' : ''}`}>
             {day}
           </div>
         ))}

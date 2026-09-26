@@ -70,5 +70,6 @@ class BaseWidget:
             "content": self.content,
             "data": self.data,
             "metadata": self.metadata,
+            "draggable": self.draggable,
             "dragging": self.dragging,
         }

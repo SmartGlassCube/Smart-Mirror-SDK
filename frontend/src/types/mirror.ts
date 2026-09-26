@@ -13,6 +13,7 @@ export type MirrorWidget<TData = unknown, TMetadata = Record<string, unknown>> =
   content?: string | null
   data?: TData | null
   metadata?: TMetadata
+  draggable?: boolean
   dragging?: boolean
 }
 

@@ -1,8 +1,52 @@
+/* Pixel-art panel: the box-shadow border leaves the corners notched, the inset shadows add a bevel. */
 .widget {
   min-width: 240px;
   max-width: 340px;
-  padding: 12px;
-  border: 1px solid #555;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.45);
+  padding: calc(var(--px) * 3);
+  background: rgba(67, 65, 170, 0.35);
+  box-shadow:
+    0 calc(var(--px) * -1) 0 0 var(--px-silver),
+    0 var(--px) 0 0 var(--px-silver),
+    calc(var(--px) * -1) 0 0 0 var(--px-silver),
+    var(--px) 0 0 0 var(--px-silver),
+    inset var(--px) var(--px) 0 0 rgba(213, 213, 213, 0.15),
+    inset calc(var(--px) * -1) calc(var(--px) * -1) 0 0 rgba(0, 0, 0, 0.4);
+}
+
+.widget h2 {
+  margin: 0 0 calc(var(--px) * 3);
+  padding-bottom: calc(var(--px) * 2);
+  border-bottom: var(--px) dashed var(--px-purple);
+  font-family: var(--font-pixel-title);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--px-orange);
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0 var(--px-black);
+}
+
+.widget img {
+  image-rendering: pixelated;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 28px);
+  gap: var(--px);
+  margin-top: calc(var(--px) * 2);
+}
+
+.calendar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  background: var(--px-indigo);
+  color: var(--px-silver);
+  box-shadow: inset -2px -2px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+.calendar-day--today {
+  background: var(--px-orange);
+  color: var(--px-black);
 }

@@ -1,5 +1,6 @@
 import type { MirrorWidget } from '../types/mirror'
 import { widgetRegistry } from '../widgets/registry'
+import DragHandle from './DragHandle'
 
 type WidgetSlotProps = {
   widget: MirrorWidget
@@ -19,6 +20,7 @@ function WidgetSlot({ widget }: WidgetSlotProps) {
 
   return (
     <div className={`widget-slot${widget.dragging ? ' widget-slot--dragging' : ''}`} style={style}>
+      {widget.draggable !== false ? <DragHandle lit={Boolean(widget.dragging)} /> : null}
       <Widget widget={widget} />
     </div>
   )
