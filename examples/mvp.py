@@ -3,7 +3,15 @@ import os
 
 from smartmirror.core import StateManager
 from smartmirror.server import SmartMirrorServer
-from smartmirror.widgets import CalendarWidget, GamesWidget, NewsWidget, QRGalleryWidget, TextWidget, WeatherWidget
+from smartmirror.widgets import (
+    CalendarWidget,
+    EventsWidget,
+    GamesWidget,
+    NewsWidget,
+    QRGalleryWidget,
+    TextWidget,
+    WeatherWidget,
+)
 from smartmirror.widgets.providers import MongoCalendarProvider, QRCodeCatalogProvider
 
 try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
@@ -42,21 +50,16 @@ if __name__ == "__main__":
         {
             "tutorial": [
                 {
-                    "title": "Setup Guide",
+                    "title": "IEEE INSAT CS Social Media",
                     "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/tutorial/setup",
                     "url": "https://example.com/tutorial/setup",
-                },
-                {
-                    "title": "Gesture Basics",
-                    "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/tutorial/gestures",
-                    "url": "https://example.com/tutorial/gestures",
                 },
             ],
             "project": [
                 {
-                    "title": "Main Repo",
+                    "title": "Smart Mirror SDK",
                     "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/project/repo",
-                    "url": "https://example.com/project/repo",
+                    "url": "https://github.com/SmartGlassCube",
                 }
             ],
         }
@@ -107,23 +110,33 @@ if __name__ == "__main__":
         draggable=False,
     )
 
+    # Placeholder cards until the club database exists. Later, pass a `data_provider`
+    # returning {"items": [{"id", "name", "description", "image"}]} instead of `items`.
+    events = EventsWidget(
+        position={"x": 0.5, "y": 0.4},
+        items=[
+            {"id": f"event-{n}", "name": "Event name", "description": "Description from the club database."}
+            for n in range(1, 4)
+        ],
+        draggable=False,
+    )
+
+    # Focus mode is not in the graph anymore. To bring it back, add `focus_page` to
+    # "nodes" and `focus_edges` to "edges" (and free up the swipe it uses from home).
+    focus_page = {"id": "focus", "widgets": [focus_text]}
+    focus_edges = [
+        {"from": "home", "to": "focus", "gesture": "two_fingers_swipe_left"},
+        {"from": "focus", "to": "home", "gesture": "two_fingers_swipe_right"},
+    ]
+
+    # games <-> home <-> events
     graph = {
         "nodes": [
             {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery]},
-            {"id": "focus", "widgets": [focus_text]},
             {"id": "games", "widgets": [games]},
+            {"id": "events", "widgets": [events]},
         ],
         "edges": [
-            {
-                "from": "home",
-                "to": "focus",
-                "gesture": "two_fingers_swipe_left",
-            },
-            {
-                "from": "focus",
-                "to": "home",
-                "gesture": "two_fingers_swipe_right",
-            },
             {
                 "from": "home",
                 "to": "games",
@@ -133,6 +146,16 @@ if __name__ == "__main__":
                 "from": "games",
                 "to": "home",
                 "gesture": "two_fingers_swipe_left",
+            },
+            {
+                "from": "home",
+                "to": "events",
+                "gesture": "two_fingers_swipe_left",
+            },
+            {
+                "from": "events",
+                "to": "home",
+                "gesture": "two_fingers_swipe_right",
             },
         ],
     }

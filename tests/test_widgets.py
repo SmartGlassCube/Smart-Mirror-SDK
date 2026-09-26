@@ -1,7 +1,7 @@
 import asyncio
 
 from smartmirror.server.widget_data import refresh_widget_data
-from smartmirror.widgets import BaseWidget, CalendarWidget, GamesWidget, TextWidget
+from smartmirror.widgets import BaseWidget, CalendarWidget, EventsWidget, GamesWidget, TextWidget
 
 
 def test_games_widget_serializes_games():
@@ -10,6 +10,14 @@ def test_games_widget_serializes_games():
     assert serialized["type"] == "games"
     assert serialized["data"] == {"games": games}
     assert GamesWidget().serialize()["data"] == {"games": []}
+
+
+def test_events_widget_serializes_items():
+    items = [{"id": "hackathon", "name": "Hackathon", "description": "24h of code", "image": "/hack.png"}]
+    serialized = EventsWidget(items=items).serialize()
+    assert serialized["type"] == "events"
+    assert serialized["data"] == {"items": items}
+    assert EventsWidget().serialize()["data"] == {"items": []}
 
 
 def test_text_widget_modes():
