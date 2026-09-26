@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { MirrorWidget } from '../types/mirror'
 import WidgetSlot from './WidgetSlot'
 
@@ -16,4 +17,5 @@ function PageView({ widgets }: PageViewProps) {
   )
 }
 
-export default PageView
+// memo: camera preview frames re-render MirrorCanvas ~10x/s; widgets only re-render on state updates.
+export default memo(PageView)

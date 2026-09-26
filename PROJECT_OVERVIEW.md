@@ -22,7 +22,7 @@ flowchart LR
 **Runtime loop** (`SmartMirrorServer.camera_loop`, roughly every 10 ms):
 
 1. Read a camera frame and mirror it horizontally (`cv2.flip`).
-2. `GestureDetector.process_frame(frame)` returns `{hands, signals, events}`.
+2. `GestureDetector.process_frame(frame)` returns `{hands, signals, events}`. At most `camera_preview_fps` (10) times a second, `CameraPreview` sends a small annotated copy (hand boxes, pointer trails, pinch line) plus the latest gesture names as a `CAMERA_FRAME` message for the frontend's corner preview. Disable this with `SmartMirrorServer(camera_preview=False)`.
 3. `StateManager.handle_gesture_events(events, signals)` returns `True` if the state changed.
 4. If the state changed, broadcast a `STATE_UPDATE` with the state snapshot (the active page) to every WebSocket client.
 5. Every 0.5 s (`widget_update_tick`), refresh widget data from each due `data_provider` on the active page and broadcast if any data changed.
@@ -37,6 +37,7 @@ Smart-Mirror-SDK/
 │   ├── server/                   # SmartMirrorServer and what it runs
 │   │   ├── app.py                # SmartMirrorServer: wires everything, camera loop, run()/stop()
 │   │   ├── websocket.py          # ClientHub: connected clients, INIT + broadcast_state
+│   │   ├── camera_preview.py     # CameraPreview: small annotated webcam frame + latest gestures
 │   │   ├── frontend_launcher.py  # FrontendLauncher: npm install + Vite dev server (passes the WS port)
 │   │   └── widget_data.py        # Calls widget data providers on their refresh interval
 │   ├── vision/                   # Computer vision (hand tracking + gestures)
@@ -267,7 +268,12 @@ A data provider is any callable, sync or async, with the signature `provider(wid
     "widgets": [ { "id": "text-4", "type": "text", "position": {"x":0.5,"y":0.5}, "content": "...",
                    "data": null, "metadata": {...}, "dragging": false } ]
   } }
+
+{ "type": "CAMERA_FRAME", "image": "data:image/jpeg;base64,...",   // ~240 px wide, ≤ 10 fps
+  "events": [ { "name": "pinch_start", "hand": "right" } ] }       // last 1.5 s, repeats collapsed
 ```
+
+The frontend shows `CAMERA_FRAME` as a small (160 px) webcam preview in the top-right corner, with the latest gestures listed under it (`mirror/CameraPreview.tsx`, `.camera-preview` in `mirror/mirror.css`).
 
 Messages from the client are only logged; the protocol is currently one-way.
 

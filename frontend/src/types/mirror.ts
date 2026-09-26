@@ -23,7 +23,17 @@ export type MirrorState = {
   widgets: MirrorWidget[]
 }
 
-export type BackendMessage = {
-  type: 'INIT' | 'STATE_UPDATE'
-  state: MirrorState
+export type GestureEventInfo = {
+  name: string
+  hand: string | null
 }
+
+// Small annotated webcam preview (JPEG data URL) plus the latest gestures.
+export type CameraFrame = {
+  image: string
+  events: GestureEventInfo[]
+}
+
+export type BackendMessage =
+  | { type: 'INIT' | 'STATE_UPDATE'; state: MirrorState }
+  | ({ type: 'CAMERA_FRAME' } & CameraFrame)

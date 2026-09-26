@@ -7,6 +7,7 @@ import websockets
 from ..core import StateManager
 from ..hal import HAL
 from ..vision import GestureDetector
+from .camera_preview import CameraPreview
 from .frontend_launcher import FrontendLauncher
 from .websocket import ClientHub
 from .widget_data import refresh_widget_data
@@ -26,6 +27,9 @@ class SmartMirrorServer:
         gesture_detector=None,
         with_camera=True,
         camera_id=0,
+        camera_preview=True,
+        camera_preview_fps=10,
+        camera_preview_width=240,
         ws_host="localhost",
         ws_port=8080,
         with_frontend=True,
@@ -45,6 +49,10 @@ class SmartMirrorServer:
         self.gesture_detector = gesture_detector
         self.with_camera = with_camera
         self.camera_id = camera_id
+        # Small annotated webcam view (+ latest gestures) in the frontend's top-right corner.
+        self.camera_preview = (
+            CameraPreview(fps=camera_preview_fps, width=camera_preview_width) if camera_preview else None
+        )
         self.ws_host = ws_host
         self.ws_port = ws_port
         self.frontend = (
@@ -115,10 +123,17 @@ class SmartMirrorServer:
 
     async def _process_frame(self, frame):
         frame = cv2.flip(frame, 1)  # mirror, so the user's left is screen-left
+        # The debug window draws on `frame` in place; keep the preview's copy clean.
+        clean_frame = frame.copy() if self.gesture_detector.debug else frame
         result = self.gesture_detector.process_frame(frame)
 
         if self.state_manager.handle_gesture_events(events=result["events"], signals=result["signals"]):
             self.hub.broadcast_state()
+
+        if self.camera_preview is not None and self.hub.clients:
+            message = self.camera_preview.message(clean_frame, result, time.time())
+            if message is not None:
+                self.hub.broadcast(message)
 
         # The debug window needs waitKey to repaint; `q` stops the server.
         if self.gesture_detector.debug and cv2.waitKey(1) & 0xFF == ord("q"):

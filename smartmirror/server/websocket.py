@@ -4,9 +4,12 @@ import websockets
 
 
 class ClientHub:
-    """Tracks connected frontend clients and pushes the mirror state to them.
+    """Tracks connected frontend clients and pushes messages to them.
 
-    Protocol (server -> client): `{"type": "INIT" | "STATE_UPDATE", "state": StateManager.get_state_snapshot()}`.
+    Protocol (server -> client):
+      - `{"type": "INIT" | "STATE_UPDATE", "state": StateManager.get_state_snapshot()}`
+      - `{"type": "CAMERA_FRAME", "image": "data:image/jpeg;base64,...", "events": [{"name", "hand"}]}`
+        (small annotated webcam preview + latest gestures, see `CameraPreview`)
     Client messages are only logged for now.
     """
 
@@ -15,11 +18,14 @@ class ClientHub:
         self.clients = set()
 
     def state_message(self, message_type="STATE_UPDATE"):
-        return json.dumps({"type": message_type, "state": self.state_manager.get_state_snapshot()})
+        return {"type": message_type, "state": self.state_manager.get_state_snapshot()}
+
+    def broadcast(self, message):
+        if self.clients:
+            websockets.broadcast(self.clients, json.dumps(message))
 
     def broadcast_state(self):
-        if self.clients:
-            websockets.broadcast(self.clients, self.state_message())
+        self.broadcast(self.state_message())
 
     async def handle_client(self, websocket):
         self.clients.add(websocket)
@@ -27,7 +33,7 @@ class ClientHub:
         print(f"[WS] Client {client_id} connected. Total: {len(self.clients)}")
 
         try:
-            await websocket.send(self.state_message("INIT"))
+            await websocket.send(json.dumps(self.state_message("INIT")))
             async for message in websocket:
                 print(f"[WS] Received from {client_id}: {message}")
         except websockets.exceptions.ConnectionClosed:
