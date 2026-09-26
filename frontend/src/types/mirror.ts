@@ -38,3 +38,5 @@ export type CameraFrame = {
 export type BackendMessage =
   | { type: 'INIT' | 'STATE_UPDATE'; state: MirrorState }
   | ({ type: 'CAMERA_FRAME' } & CameraFrame)
+  // Someone talked to the chatbot: wakes Abdo (see assistant/Abdo.tsx).
+  | { type: 'ASSISTANT_WAKE' }

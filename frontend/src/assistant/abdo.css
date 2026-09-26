@@ -1,0 +1,23 @@
+/* Pinned to the bottom center; never moves, never takes input. */
+.abdo {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  z-index: 5;
+  width: 220px;
+  height: 220px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.abdo__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Transition GIF is mounted hidden until decoded, so the sleeping GIF stays up meanwhile. */
+.abdo__img--loading {
+  visibility: hidden;
+}
