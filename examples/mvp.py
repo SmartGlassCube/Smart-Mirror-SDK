@@ -3,7 +3,7 @@ import os
 
 from smartmirror.core import StateManager
 from smartmirror.server import SmartMirrorServer
-from smartmirror.widgets import CalendarWidget, NewsWidget, QRGalleryWidget, TextWidget, WeatherWidget
+from smartmirror.widgets import CalendarWidget, GamesWidget, NewsWidget, QRGalleryWidget, TextWidget, WeatherWidget
 from smartmirror.widgets.providers import MongoCalendarProvider, QRCodeCatalogProvider
 
 try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
@@ -100,10 +100,18 @@ if __name__ == "__main__":
         ],
     )
 
+    # Placeholder slots until the computer-vision games exist; give each one an "icon" image URL.
+    games = GamesWidget(
+        position={"x": 0.5, "y": 0.4},
+        games=[{"id": f"game-{n}", "title": "Coming soon"} for n in range(1, 7)],
+        draggable=False,
+    )
+
     graph = {
         "nodes": [
             {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery]},
             {"id": "focus", "widgets": [focus_text]},
+            {"id": "games", "widgets": [games]},
         ],
         "edges": [
             {
@@ -115,6 +123,16 @@ if __name__ == "__main__":
                 "from": "focus",
                 "to": "home",
                 "gesture": "two_fingers_swipe_right",
+            },
+            {
+                "from": "home",
+                "to": "games",
+                "gesture": "two_fingers_swipe_right",
+            },
+            {
+                "from": "games",
+                "to": "home",
+                "gesture": "two_fingers_swipe_left",
             },
         ],
     }

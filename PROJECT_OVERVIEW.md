@@ -62,7 +62,7 @@ Smart-Mirror-SDK/
 │   ├── widgets/                  # Python widget models (serialized to the frontend)
 │   │   ├── base.py               # BaseWidget (subclass + set `type` to add a widget)
 │   │   ├── text.py               # TextWidget: list/section navigation
-│   │   ├── calendar.py  weather.py  news.py  qr_gallery.py
+│   │   ├── calendar.py  weather.py  news.py  qr_gallery.py  games.py
 │   │   └── providers/            # Widget data sources
 │   │       ├── mongo_calendar.py # MongoCalendarProvider
 │   │       └── qr_catalog.py     # QRCodeCatalogProvider
@@ -79,7 +79,7 @@ Smart-Mirror-SDK/
 │       ├── services/useWebSocket.ts # Auto-reconnecting WS client (port from VITE_SMARTMIRROR_WS_PORT)
 │       └── types/mirror.ts       # Wire format: MirrorWidget, MirrorState, BackendMessage
 ├── examples/
-│   ├── mvp.py                    # Full demo: 2 pages, 5 widget types, gesture navigation
+│   ├── mvp.py                    # Full demo: 3 pages, 6 widget types, gesture navigation
 │   └── gesture_detector_debug.py # Standalone CV debug window
 ├── tests/                        # pytest unit tests with synthetic hands (no camera)
 ├── docs/
@@ -242,6 +242,7 @@ Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` 
 | `TextWidget` | `text` | `content` can be a string, a list (swipe left/right cycles items) or a dict of lists (swipe up/down changes section). Implements `apply_navigation`. |
 | `CalendarWidget` | `calendar` | Expects `data = {"events": [...]}` |
 | `QRGalleryWidget` | `qr_gallery` | Expects `data = {"categories": {name: [{title, imageUrl, url}]}}` |
+| `GamesWidget` | `games` | Tiles for computer-vision games: `GamesWidget(games=[{id, title, icon}])`, `icon` an optional image URL |
 | `WeatherWidget` | `weather` | Placeholder |
 | `NewsWidget` | `news` | Placeholder |
 
