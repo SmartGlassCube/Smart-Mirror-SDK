@@ -4,6 +4,7 @@ import Abdo, { type AbdoHandle } from '../assistant/Abdo'
 import { useWebSocket } from '../services/useWebSocket'
 import type { BackendMessage, CameraFrame, MirrorState } from '../types/mirror'
 import CameraPreview from './CameraPreview'
+import HandCursor, { type HandCursorHandle } from './HandCursor'
 import PageView from './PageView'
 
 function MirrorCanvas() {
@@ -11,10 +12,13 @@ function MirrorCanvas() {
   const [cameraFrame, setCameraFrame] = useState<CameraFrame | null>(null)
   const abdoRef = useRef<AbdoHandle>(null)
   const nodeIdRef = useRef<string | null>(null)
+  const cursorRef = useRef<HandCursorHandle>(null)
 
   const onMessage = useCallback((message: BackendMessage) => {
     if (message.type === 'CAMERA_FRAME') {
       setCameraFrame(message)
+    } else if (message.type === 'POINTER') {
+      cursorRef.current?.move(message.position)
     } else if (message.type === 'ASSISTANT_WAKE') {
       abdoRef.current?.wake()
     } else {
@@ -41,6 +45,7 @@ function MirrorCanvas() {
       {isConnected && cameraFrame ? <CameraPreview frame={cameraFrame} /> : null}
       <PageView key={state.nodeId ?? 'none'} widgets={state.widgets} />
       <Abdo ref={abdoRef} />
+      {isConnected ? <HandCursor ref={cursorRef} /> : null}
     </div>
   )
 }

@@ -35,8 +35,16 @@ export type CameraFrame = {
   events: GestureEventInfo[]
 }
 
+// 0..1 fractions of the screen, like widget positions.
+export type PointerPosition = {
+  x: number
+  y: number
+}
+
 export type BackendMessage =
   | { type: 'INIT' | 'STATE_UPDATE'; state: MirrorState }
   | ({ type: 'CAMERA_FRAME' } & CameraFrame)
+  // Index fingertip for the cursor (server/hand_pointer.py); null when the hand is lost.
+  | { type: 'POINTER'; position: PointerPosition | null }
   // Someone talked to the chatbot: wakes Abdo (see assistant/Abdo.tsx).
   | { type: 'ASSISTANT_WAKE' }

@@ -95,3 +95,22 @@
     filter: drop-shadow(0 0 12px var(--px-orange));
   }
 }
+
+/* Index-fingertip cursor (see HandCursor.tsx): a small hollow ring, always faint. */
+.hand-cursor {
+  position: absolute;
+  z-index: 200;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  border: 2px solid var(--px-silver);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.15s linear;
+  pointer-events: none;
+}
+
+.hand-cursor--visible {
+  opacity: 0.4;
+}

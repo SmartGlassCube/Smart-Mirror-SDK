@@ -9,6 +9,7 @@ from ..hal import HAL
 from ..vision import GestureDetector
 from .camera_preview import CameraPreview
 from .frontend_launcher import FrontendLauncher
+from .hand_pointer import HandPointer
 from .websocket import ClientHub
 from .widget_data import refresh_widget_data
 
@@ -30,6 +31,7 @@ class SmartMirrorServer:
         camera_preview=True,
         camera_preview_fps=10,
         camera_preview_width=240,
+        pointer_hand="right",
         ws_host="localhost",
         ws_port=8080,
         with_frontend=True,
@@ -53,6 +55,8 @@ class SmartMirrorServer:
         self.camera_preview = (
             CameraPreview(fps=camera_preview_fps, width=camera_preview_width) if camera_preview else None
         )
+        # Cursor following this hand's index fingertip ("left", "right", or None to hide it).
+        self.hand_pointer = HandPointer(hand=pointer_hand) if pointer_hand else None
         self.ws_host = ws_host
         self.ws_port = ws_port
         self.frontend = (
@@ -129,6 +133,11 @@ class SmartMirrorServer:
 
         if self.state_manager.handle_gesture_events(events=result["events"], signals=result["signals"]):
             self.hub.broadcast_state()
+
+        if self.hand_pointer is not None and self.hub.clients:
+            message = self.hand_pointer.message(result["signals"])
+            if message is not None:
+                self.hub.broadcast(message)
 
         if self.camera_preview is not None and self.hub.clients:
             message = self.camera_preview.message(clean_frame, result, time.time())

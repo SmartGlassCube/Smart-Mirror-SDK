@@ -10,6 +10,8 @@ class ClientHub:
       - `{"type": "INIT" | "STATE_UPDATE", "state": StateManager.get_state_snapshot()}`
       - `{"type": "CAMERA_FRAME", "image": "data:image/jpeg;base64,...", "events": [{"name", "hand"}]}`
         (small annotated webcam preview + latest gestures, see `CameraPreview`)
+      - `{"type": "POINTER", "position": {"x", "y"} | None}`: index fingertip for the cursor
+        (see `HandPointer`); `None` when the hand is lost
       - `{"type": "ASSISTANT_WAKE"}`: someone talked to the chatbot; wakes the Abdo avatar
         (`hub.broadcast({"type": "ASSISTANT_WAKE"})`). Page changes wake it on their own.
     Client messages are only logged for now.

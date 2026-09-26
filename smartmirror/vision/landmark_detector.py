@@ -14,6 +14,7 @@ MODEL_URL = (
     "hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
 )
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "hand_landmarker.task"
+_OTHER_SIDE = {"left": "right", "right": "left"}
 
 
 def ensure_model(model_path: Path = DEFAULT_MODEL_PATH) -> Path:
@@ -26,7 +27,12 @@ def ensure_model(model_path: Path = DEFAULT_MODEL_PATH) -> Path:
 
 
 class LandmarkDetector:
-    """Runs the MediaPipe Hand Landmarker and returns a stable `{"left": HandData, "right": HandData}`."""
+    """Runs the MediaPipe Hand Landmarker and returns a stable `{"left": HandData, "right": HandData}`.
+
+    Sides are the user's own hands. The pipeline feeds mirrored (flipped) frames, on which
+    MediaPipe reports the opposite hand, so its labels are swapped by default; pass
+    `swap_handedness=False` for frames that are not flipped.
+    """
 
     RAISED_Y_THRESHOLD = 0.5
 
@@ -37,7 +43,9 @@ class LandmarkDetector:
         min_hand_detection_confidence: float = 0.5,
         min_hand_presence_confidence: float = 0.5,
         min_tracking_confidence: float = 0.5,
+        swap_handedness: bool = True,
     ):
+        self.swap_handedness = swap_handedness
         model = ensure_model(Path(model_path) if model_path else DEFAULT_MODEL_PATH)
         options = vision.HandLandmarkerOptions(
             base_options=python.BaseOptions(model_asset_path=str(model)),
@@ -66,6 +74,8 @@ class LandmarkDetector:
             if not handedness:
                 continue
             label = handedness[0].category_name.lower()
+            if self.swap_handedness:
+                label = _OTHER_SIDE.get(label, label)
             if label in hands:
                 hands[label] = self._build_hand_data(hand_landmarks)
 
