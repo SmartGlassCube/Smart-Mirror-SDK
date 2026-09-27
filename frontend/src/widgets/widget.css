@@ -1,7 +1,7 @@
 /* Pixel-art panel: the box-shadow border leaves the corners notched, the inset shadows add a bevel. */
 .widget {
-  min-width: 240px;
-  max-width: 340px;
+  min-width: calc(var(--u) * 240);
+  max-width: calc(var(--u) * 340);
   padding: calc(var(--px) * 3);
   background: rgba(67, 65, 170, 0.35);
   box-shadow:
@@ -18,20 +18,25 @@
   padding-bottom: calc(var(--px) * 2);
   border-bottom: var(--px) dashed var(--px-purple);
   font-family: var(--font-pixel-title);
-  font-size: 14px;
+  font-size: calc(var(--u) * 14);
   line-height: 1.4;
   color: var(--px-orange);
   text-transform: uppercase;
-  text-shadow: 2px 2px 0 var(--px-black);
+  text-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 var(--px-black);
 }
 
 .widget img {
   image-rendering: pixelated;
 }
 
+/* One line of text or a headline; keeps the widget from jumping as it changes. */
+.widget-message {
+  min-height: calc(var(--u) * 40);
+}
+
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 28px);
+  grid-template-columns: repeat(7, calc(var(--u) * 28));
   gap: var(--px);
   margin-top: calc(var(--px) * 2);
 }
@@ -40,15 +45,20 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
+  height: calc(var(--u) * 28);
   background: var(--px-indigo);
   color: var(--px-silver);
-  box-shadow: inset -2px -2px 0 0 rgba(0, 0, 0, 0.5);
+  box-shadow: inset calc(var(--u) * -2) calc(var(--u) * -2) 0 0 rgba(0, 0, 0, 0.5);
 }
 
 .calendar-day--today {
   background: var(--px-orange);
   color: var(--px-black);
+}
+
+.calendar-events {
+  margin-top: calc(var(--px) * 2);
+  text-align: left;
 }
 
 .games-widget {
@@ -57,7 +67,7 @@
 
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(3, 120px);
+  grid-template-columns: repeat(3, calc(var(--u) * 120));
   gap: calc(var(--px) * 5) calc(var(--px) * 4);
   margin-top: calc(var(--px) * 3);
 }
@@ -84,14 +94,14 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-pixel-title);
-  font-size: 32px;
+  font-size: calc(var(--u) * 32);
   color: var(--px-orange);
-  text-shadow: 3px 3px 0 var(--px-black);
+  text-shadow: calc(var(--u) * 3) calc(var(--u) * 3) 0 var(--px-black);
 }
 
 .game-tile__icon {
-  width: 88px;
-  height: 88px;
+  width: calc(var(--u) * 88);
+  height: calc(var(--u) * 88);
 }
 
 .game-tile__icon img {
@@ -111,7 +121,7 @@
 
 .events-grid {
   display: grid;
-  grid-template-columns: repeat(3, 200px);
+  grid-template-columns: repeat(3, calc(var(--u) * 200));
   gap: calc(var(--px) * 6);
   margin-top: calc(var(--px) * 3);
 }
@@ -123,7 +133,7 @@
 }
 
 .event-card__image {
-  height: 120px;
+  height: calc(var(--u) * 120);
   overflow: hidden;
 }
 
@@ -158,13 +168,24 @@
 
 /* 20x20 pixel icon at 3x: whole-number scale keeps every pixel square. */
 .weather-now__icon {
-  width: 60px;
-  height: 60px;
+  width: calc(var(--u) * 60);
+  height: calc(var(--u) * 60);
 }
 
 .weather-now__temperature {
   font-family: var(--font-pixel-title);
-  font-size: 20px;
+  font-size: calc(var(--u) * 20);
   line-height: 1.4;
   color: var(--px-orange);
+}
+
+.qr-category {
+  margin-top: calc(var(--px) * 2);
+}
+
+.qr-category__image {
+  width: calc(var(--u) * 100);
+  height: calc(var(--u) * 100);
+  margin-top: var(--px);
+  object-fit: contain;
 }

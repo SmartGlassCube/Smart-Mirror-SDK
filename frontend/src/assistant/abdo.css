@@ -1,6 +1,6 @@
 /* Shared by Abdo and his speech bubble, which is positioned relative to him. */
 :root {
-  --abdo-size: 300px;
+  --abdo-size: calc(var(--u) * 300);
   --abdo-bottom: calc(var(--px) * 1);
 }
 
@@ -31,8 +31,8 @@
 /* Speech bubble*/
 .abdo-speech {
   position: absolute;
-  bottom: calc(var(--abdo-bottom) + var(--abdo-size) / 2.5) ;
-  left: 49.8%;
+  bottom: calc(var(--abdo-bottom) + var(--abdo-size) / 2.5);
+  left: 50%;
   z-index: 6;
   transform: translate(-50%, 100%);
   pointer-events: none;

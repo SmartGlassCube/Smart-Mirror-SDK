@@ -24,7 +24,7 @@ const CalendarWidget = ({ widget }: WidgetProps<CalendarData>) => {
         ))}
       </div>
       {events.length > 0 ? (
-        <div style={{ marginTop: 8, textAlign: 'left' }}>
+        <div className="calendar-events">
           {events.slice(0, 3).map((event, index) => (
             <div key={`${event.title ?? 'event'}-${index}`}>
               • {event.title ?? 'Untitled'}

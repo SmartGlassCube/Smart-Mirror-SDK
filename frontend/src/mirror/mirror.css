@@ -7,21 +7,21 @@
 
 .mirror-status {
   position: absolute;
-  top: 12px;
-  left: 12px;
+  top: calc(var(--px) * 3);
+  left: calc(var(--px) * 3);
   z-index: 10;
   font-family: var(--font-pixel-title);
-  font-size: 10px;
+  font-size: calc(var(--u) * 10);
   color: var(--px-silver);
   opacity: 0.8;
 }
 
 .camera-preview {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: calc(var(--px) * 3);
+  right: calc(var(--px) * 3);
   z-index: 10;
-  width: 160px;
+  width: calc(var(--u) * 160);
   opacity: 0.85;
 }
 
@@ -33,7 +33,7 @@
 }
 
 .camera-preview__event {
-  font-size: 18px;
+  font-size: calc(var(--u) * 18);
   color: var(--px-orange);
   text-align: right;
 }
@@ -41,11 +41,24 @@
 .mirror-page {
   position: absolute;
   inset: 0;
+  /* cqw/cqh units below = the page size */
+  container-type: size;
 }
 
+/* --x/--y are the widget's 0..1 position (see WidgetSlot.tsx). The widget is centered on it, but
+   shifted back inside the screen, keeping --slot-margin clear, when centering would cut it off. */
 .widget-slot {
+  --slot-margin: calc(var(--px) * 3);
+  /* the drag handle sticks out above the widget */
+  --slot-margin-top: calc(var(--slot-margin) + var(--drag-handle-height) + var(--px));
   position: absolute;
-  transform: translate(-50%, -50%);
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * 100%);
+  /* Without this a widget near the right edge only gets the space left of the edge and wraps. */
+  width: max-content;
+  translate:
+    clamp(calc(var(--slot-margin) - var(--x) * 100cqw), -50%, calc((1 - var(--x)) * 100cqw - 100% - var(--slot-margin)))
+    clamp(calc(var(--slot-margin-top) - var(--y) * 100cqh), -50%, calc((1 - var(--y)) * 100cqh - 100% - var(--slot-margin)));
   transition: left 0.08s linear, top 0.08s linear;
 }
 
@@ -55,13 +68,17 @@
 }
 
 /* Pixel half circle resting on the widget's top border (see DragHandle.tsx). */
+:root {
+  /* 16x8 grid at 3 design pixels per pixel */
+  --drag-handle-height: calc(var(--u) * 24);
+}
+
 .drag-handle {
   position: absolute;
   bottom: calc(100% + var(--px));
   left: 50%;
-  /* 16x8 grid at 3px per pixel */
-  width: 48px;
-  height: 24px;
+  width: calc(var(--drag-handle-height) * 2);
+  height: var(--drag-handle-height);
   transform: translateX(-50%);
 }
 
@@ -78,7 +95,7 @@
 }
 
 .drag-handle--lit {
-  filter: drop-shadow(0 0 6px var(--px-orange));
+  filter: drop-shadow(0 0 calc(var(--u) * 6) var(--px-orange));
   animation: drag-handle-blink 0.4s steps(2, jump-none) infinite alternate;
 }
 
@@ -92,7 +109,7 @@
 
 @keyframes drag-handle-blink {
   to {
-    filter: drop-shadow(0 0 12px var(--px-orange));
+    filter: drop-shadow(0 0 calc(var(--u) * 12) var(--px-orange));
   }
 }
 
@@ -100,10 +117,10 @@
 .hand-cursor {
   position: absolute;
   z-index: 200;
-  width: 20px;
-  height: 20px;
+  width: calc(var(--u) * 20);
+  height: calc(var(--u) * 20);
   box-sizing: border-box;
-  border: 2px solid var(--px-silver);
+  border: calc(var(--u) * 2) solid var(--px-silver);
   border-radius: 50%;
   opacity: 0;
   transform: translate(-50%, -50%);

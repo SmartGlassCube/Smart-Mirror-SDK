@@ -17,7 +17,7 @@ const TextWidget = ({ widget }: WidgetProps<unknown, TextMetadata>) => {
       <h2>Text</h2>
       {metadata.contentMode === 'dict' && metadata.key ? <div>Section: {metadata.key}</div> : null}
       {hasIndex ? <div>Item: {(metadata.itemIndex ?? 0) + 1}/{metadata.activeItemCount}</div> : null}
-      <div style={{ minHeight: 40 }}>{widget.content ?? 'Welcome to Smart Mirror!'}</div>
+      <div className="widget-message">{widget.content ?? 'Welcome to Smart Mirror!'}</div>
     </div>
   )
 }

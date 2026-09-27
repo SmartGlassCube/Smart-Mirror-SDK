@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react'
 import type { MirrorWidget } from '../types/mirror'
 import { widgetRegistry } from '../widgets/registry'
 import DragHandle from './DragHandle'
@@ -13,10 +14,11 @@ function WidgetSlot({ widget }: WidgetSlotProps) {
     return null
   }
 
+  // mirror.css places the slot from these and keeps it on screen.
   const style = {
-    left: `${(widget.position?.x ?? 0.1) * 100}%`,
-    top: `${(widget.position?.y ?? 0.1) * 100}%`,
-  }
+    '--x': widget.position?.x ?? 0.1,
+    '--y': widget.position?.y ?? 0.1,
+  } as CSSProperties
 
   return (
     <div className={`widget-slot${widget.dragging ? ' widget-slot--dragging' : ''}`} style={style}>

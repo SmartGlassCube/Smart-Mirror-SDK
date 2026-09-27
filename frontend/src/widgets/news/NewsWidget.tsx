@@ -21,7 +21,7 @@ const NewsWidget = ({ widget }: WidgetProps) => {
   return (
     <div className="widget news-widget">
       <h2>News</h2>
-      <div style={{ minHeight: 40 }}>{widget.content ?? placeholderHeadlines[index]}</div>
+      <div className="widget-message">{widget.content ?? placeholderHeadlines[index]}</div>
     </div>
   )
 }

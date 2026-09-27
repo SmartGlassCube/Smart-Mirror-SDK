@@ -17,16 +17,12 @@ const QRGalleryWidget = ({ widget }: WidgetProps<QrGalleryData>) => {
         const firstEntry = entries[0]
 
         return (
-          <div key={name} style={{ marginTop: 8 }}>
+          <div key={name} className="qr-category">
             <strong>{name}</strong>
             <div>{entries.length} item(s)</div>
             {firstEntry?.title ? <div>First: {firstEntry.title}</div> : null}
             {firstEntry?.imageUrl ? (
-              <img
-                src={firstEntry.imageUrl}
-                alt={firstEntry.title ?? `${name} qr`}
-                style={{ width: 100, height: 100, objectFit: 'contain', marginTop: 4 }}
-              />
+              <img className="qr-category__image" src={firstEntry.imageUrl} alt={firstEntry.title ?? `${name} qr`} />
             ) : null}
           </div>
         )

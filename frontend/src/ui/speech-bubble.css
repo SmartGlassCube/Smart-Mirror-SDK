@@ -3,7 +3,7 @@
   position: relative;
   box-sizing: border-box;
   width: max-content;
-  max-width: min(640px, calc(100vw - 32px));
+  max-width: min(calc(var(--u) * 640), calc(100vw - var(--px) * 8));
   padding: var(--px) calc(var(--px) * 4);
   border: calc(var(--px) * 4) solid transparent;
   border-image-slice: 4 fill;
