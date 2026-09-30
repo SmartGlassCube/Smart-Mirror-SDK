@@ -19,7 +19,6 @@ dependencies = [
   "opencv-python>=4.8.0",
   "websockets>=12.0",
   "numpy>=1.24.0"
-
 ]
 
 [project.optional-dependencies]
@@ -31,7 +30,7 @@ dev = [
 ]
 data = [
   "pymongo>=4.7.0",
-  "dotenv>=0.9.0"
+  "python-dotenv>=1.0"
 ]
 
 [tool.setuptools.packages.find]
@@ -40,7 +39,7 @@ include = ["smartmirror*"]
 
 [tool.setuptools.package-data]
 smartmirror = [
-  "ui/dist/**/*",
+  "config/json_config/*.json",
 ]
 
 [tool.pytest.ini_options]

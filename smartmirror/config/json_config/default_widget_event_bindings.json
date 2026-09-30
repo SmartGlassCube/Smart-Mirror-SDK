@@ -1,6 +1,7 @@
 {
   "swipe_left": {
     "handler": "_handle_widget_navigation",
+    "target": "navigable",
     "horizontal_steps": 1,
     "vertical_steps": 0,
     "cooldown_key": "horizontal",
@@ -8,6 +9,7 @@
   },
   "swipe_right": {
     "handler": "_handle_widget_navigation",
+    "target": "navigable",
     "horizontal_steps": -1,
     "vertical_steps": 0,
     "cooldown_key": "horizontal",
@@ -15,6 +17,7 @@
   },
   "swipe_up": {
     "handler": "_handle_widget_navigation",
+    "target": "navigable",
     "horizontal_steps": 0,
     "vertical_steps": -1,
     "cooldown_key": "vertical",
@@ -22,6 +25,7 @@
   },
   "swipe_down": {
     "handler": "_handle_widget_navigation",
+    "target": "navigable",
     "horizontal_steps": 0,
     "vertical_steps": 1,
     "cooldown_key": "vertical",
@@ -29,12 +33,26 @@
   },
   "scroll_start": {
     "handler": "_handle_widget_scroll",
+    "target": "navigable",
     "cooldown_key": "vertical",
     "cooldown_config": "scroll_cooldown"
   },
   "scroll_update": {
     "handler": "_handle_widget_scroll",
+    "target": "navigable",
     "cooldown_key": "vertical",
     "cooldown_config": "scroll_cooldown"
+  },
+  "pinch_start": {
+    "handler": "_handle_widget_drag_start",
+    "target": "draggable"
+  },
+  "pinch_move": {
+    "handler": "_handle_widget_drag_move",
+    "target": "none"
+  },
+  "pinch_end": {
+    "handler": "_handle_widget_drag_end",
+    "target": "none"
   }
 }

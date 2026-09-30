@@ -1,0 +1,45 @@
+:root {
+  /* palette */
+  --px-black: #000000;
+  --px-silver: #d5d5d5;
+  --px-orange: #fd7a33;
+  --px-purple: #ab32ac;
+  --px-indigo: #4341aa;
+
+  /* Every size is a multiple of --u (one design pixel). The UI has its original size (--u = 1px)
+     on a screen at least 1080 wide and 950 tall: the portrait 1080x1920 mirror, or a browser window
+     on a 1920x1080 laptop. Smaller screens scale it down to fit, bigger ones scale it up. */
+  --design-width: 1080;
+  --design-height: 950;
+  --u: min(100vw / var(--design-width), 100vh / var(--design-height));
+
+  /* one "pixel" of the retro grid */
+  --px: calc(var(--u) * 4);
+
+  --font-pixel-title: 'Press Start 2P', monospace;
+  --font-pixel-body: 'VT323', monospace;
+
+  font-family: var(--font-pixel-body);
+  font-size: calc(var(--u) * 26);
+  line-height: 1.2;
+  font-weight: 400;
+  color: var(--px-silver);
+  background-color: var(--px-black);
+
+  font-synthesis: none;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--px-orange);
+  text-decoration: inherit;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}

@@ -1,0 +1,133 @@
+.mirror-canvas {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.mirror-status {
+  position: absolute;
+  top: calc(var(--px) * 3);
+  left: calc(var(--px) * 3);
+  z-index: 10;
+  font-family: var(--font-pixel-title);
+  font-size: calc(var(--u) * 10);
+  color: var(--px-silver);
+  opacity: 0.8;
+}
+
+.camera-preview {
+  position: absolute;
+  top: calc(var(--px) * 3);
+  right: calc(var(--px) * 3);
+  z-index: 10;
+  width: calc(var(--u) * 160);
+  opacity: 0.85;
+}
+
+.camera-preview__image {
+  display: block;
+  width: 100%;
+  border: var(--px) solid var(--px-purple);
+  image-rendering: pixelated;
+}
+
+.camera-preview__event {
+  font-size: calc(var(--u) * 18);
+  color: var(--px-orange);
+  text-align: right;
+}
+
+.mirror-page {
+  position: absolute;
+  inset: 0;
+  /* cqw/cqh units below = the page size */
+  container-type: size;
+}
+
+/* --x/--y are the widget's 0..1 position (see WidgetSlot.tsx). The widget is centered on it, but
+   shifted back inside the screen, keeping --slot-margin clear, when centering would cut it off. */
+.widget-slot {
+  --slot-margin: calc(var(--px) * 3);
+  /* the drag handle sticks out above the widget */
+  --slot-margin-top: calc(var(--slot-margin) + var(--drag-handle-height) + var(--px));
+  position: absolute;
+  left: calc(var(--x) * 100%);
+  top: calc(var(--y) * 100%);
+  /* Without this a widget near the right edge only gets the space left of the edge and wraps. */
+  width: max-content;
+  translate:
+    clamp(calc(var(--slot-margin) - var(--x) * 100cqw), -50%, calc((1 - var(--x)) * 100cqw - 100% - var(--slot-margin)))
+    clamp(calc(var(--slot-margin-top) - var(--y) * 100cqh), -50%, calc((1 - var(--y)) * 100cqh - 100% - var(--slot-margin)));
+  transition: left 0.08s linear, top 0.08s linear;
+}
+
+.widget-slot--dragging {
+  z-index: 100;
+  transition: none;
+}
+
+/* Pixel half circle resting on the widget's top border (see DragHandle.tsx). */
+:root {
+  /* 16x8 grid at 3 design pixels per pixel */
+  --drag-handle-height: calc(var(--u) * 24);
+}
+
+.drag-handle {
+  position: absolute;
+  bottom: calc(100% + var(--px));
+  left: 50%;
+  width: calc(var(--drag-handle-height) * 2);
+  height: var(--drag-handle-height);
+  transform: translateX(-50%);
+}
+
+.drag-handle__outline {
+  fill: var(--px-silver);
+}
+
+.drag-handle__fill {
+  fill: var(--px-indigo);
+}
+
+.drag-handle__shine {
+  fill: var(--px-purple);
+}
+
+.drag-handle--lit {
+  filter: drop-shadow(0 0 calc(var(--u) * 6) var(--px-orange));
+  animation: drag-handle-blink 0.4s steps(2, jump-none) infinite alternate;
+}
+
+.drag-handle--lit .drag-handle__fill {
+  fill: var(--px-orange);
+}
+
+.drag-handle--lit .drag-handle__shine {
+  fill: var(--px-silver);
+}
+
+@keyframes drag-handle-blink {
+  to {
+    filter: drop-shadow(0 0 calc(var(--u) * 12) var(--px-orange));
+  }
+}
+
+/* Index-fingertip cursor (see HandCursor.tsx): a small hollow ring, always faint. */
+.hand-cursor {
+  position: absolute;
+  z-index: 200;
+  width: calc(var(--u) * 20);
+  height: calc(var(--u) * 20);
+  box-sizing: border-box;
+  border: calc(var(--u) * 2) solid var(--px-silver);
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.15s linear;
+  pointer-events: none;
+}
+
+.hand-cursor--visible {
+  opacity: 0.4;
+}
