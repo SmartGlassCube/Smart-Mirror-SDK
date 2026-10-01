@@ -4,6 +4,7 @@ from .config import StateManager
 
 import asyncio
 import inspect
+import logging
 import cv2
 from pathlib import Path
 import os
@@ -13,12 +14,15 @@ import shutil
 import time
 import websockets
 
+logger = logging.getLogger(__name__)
+
 class SmartMirrorServer:
 
     def __init__(self,
                   graph,
                   hardware = None,
                   assistant = None,
+                  assistant_widget = None,
                   with_camera = True,
                   with_microphone = False,
                   state_manager = None,
@@ -37,6 +41,7 @@ class SmartMirrorServer:
         self.ws_port = ws_port
         self.graph = graph
         self.assistant = assistant
+        self.assistant_widget = assistant_widget
         self.with_camera = with_camera
         self.with_microphone = with_microphone
         self.with_ui = with_ui
@@ -262,30 +267,36 @@ class SmartMirrorServer:
                     await asyncio.sleep(0.02)
                     continue
 
-                frame = cv2.flip(frame, 1)
-                detector_output = self.gesture_detector.process_frame(frame)
+                try:
+                    frame = cv2.flip(frame, 1)
+                    detector_output = self.gesture_detector.process_frame(frame)
 
-                if self.state_manager.handle_gesture_events(
-                    events=detector_output.get("events", []),
-                    signals=detector_output.get("signals", {}),
-                ):
-                    await self.broadcast(
-                        {
-                            "type": "STATE_UPDATE",
-                            "state": self.state_manager.get_state_snapshot(),
-                        }
-                    )
+                    if self.state_manager.handle_gesture_events(
+                        events=detector_output.get("events", []),
+                        signals=detector_output.get("signals", {}),
+                    ):
+                        await self.broadcast(
+                            {
+                                "type": "STATE_UPDATE",
+                                "state": self.state_manager.get_state_snapshot(),
+                            }
+                        )
 
-                now = time.time()
-                if now - last_widget_refresh >= self.widget_update_tick:
-                    await self._refresh_widget_data()
-                    last_widget_refresh = now
+                    now = time.time()
+                    if now - last_widget_refresh >= self.widget_update_tick:
+                        await self._refresh_widget_data()
+                        last_widget_refresh = now
 
-                if self.show_debug_window and self.gesture_detector.debug:
-                    cv2.imshow("Smart Mirror - Debug", frame)
-                    key = cv2.waitKey(1) & 0xFF
-                    if key == ord("q"):
-                        self.running = False
+                    if self.show_debug_window and self.gesture_detector.debug:
+                        cv2.imshow("Smart Mirror - Debug", frame)
+                        key = cv2.waitKey(1) & 0xFF
+                        if key == ord("q"):
+                            self.running = False
+                except Exception:
+                    # One bad frame (a gesture-detector hiccup, a broadcast
+                    # error, ...) must not take gesture nav down for the
+                    # whole session -- log it and keep processing frames.
+                    logger.exception("camera_loop: error processing a frame -- skipping it")
 
                 await asyncio.sleep(0.01)
         finally:
@@ -293,6 +304,40 @@ class SmartMirrorServer:
             if self.gesture_detector.debug:
                 cv2.destroyAllWindows()
     
+    async def _handle_assistant_result(self, result):
+        """Report one voice exchange {"transcript", "answer"} through the existing
+        broadcast()/STATE_UPDATE mechanism -- no parallel channel, no protocol
+        the UI doesn't already know how to render.
+
+        Updates self.assistant_widget's content (a plain TextWidget, so
+        App.tsx renders it with zero frontend changes) and re-broadcasts the
+        state snapshot, exactly like a gesture-driven state change does.
+        """
+        transcript = result.get("transcript") or ""
+        answer = result.get("answer") or ""
+
+        if self.assistant_widget is not None:
+            self.assistant_widget.content = f"You: {transcript}\nAssistant: {answer}"
+
+        await self.broadcast({
+            "type": "STATE_UPDATE",
+            "state": self.state_manager.get_state_snapshot(),
+        })
+
+    async def assistant_loop(self):
+        """Run the assistant's wake-word -> STT -> chat() loop, gated by with_microphone.
+
+        Scheduled alongside camera_loop via asyncio.gather in run() so voice
+        and gesture input are handled concurrently, not one blocking the
+        other. Mic/speaker I/O goes through self.hardware (HAL), the same
+        instance camera_loop's sibling components would use, so a future
+        Pi-specific HAL swap only has to happen in one place.
+        """
+        if not self.with_microphone or self.assistant is None:
+            return
+
+        await self.assistant.listen_loop(hal=self.hardware, on_result=self._handle_assistant_result)
+
     async def run(self):
         """Start the server."""
         print(f"[Server] Starting Smart Mirror Backend")
@@ -303,6 +348,19 @@ class SmartMirrorServer:
         try:
             async with websockets.serve(self.handle_client, "localhost", self.ws_port):
                 await self._start_ui()
-                await self.camera_loop()
+                # return_exceptions=True: an unhandled failure in one loop
+                # (e.g. assistant_loop) must not cancel the other (e.g.
+                # camera_loop) -- gesture nav should keep working even if
+                # voice is having a bad day, and vice versa. This only
+                # covers ordinary Python exceptions; a segfault in a native
+                # library (whisper.cpp/mediapipe/PortAudio) still kills the
+                # whole process -- see scripts/voice_pipeline_manual_test.md
+                # for why this needs process-level supervision too.
+                results = await asyncio.gather(
+                    self.camera_loop(), self.assistant_loop(), return_exceptions=True
+                )
+                for result in results:
+                    if isinstance(result, Exception):
+                        logger.error("A server loop exited with an unhandled exception", exc_info=result)
         finally:
             await self._stop_ui()

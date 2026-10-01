@@ -9,6 +9,8 @@ flow against a real LLM endpoint when you have credentials.
 """
 
 import functools
+import time
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -71,22 +73,319 @@ def test_add_documents_makes_them_retrievable(isolated_vector_store, tmp_path, f
     assert "gesture-driven UI" in user_message
 
 
-def test_voice_chat_is_not_implemented_yet(isolated_vector_store, fake_backend):
+def test_system_prompt_instructs_against_acting_on_placeholder_meta_commentary(
+    isolated_vector_store, tmp_path, fake_backend
+):
+    """Guards against two failure modes seen live: (1) treating retrieved
+    developer notes ("replace this file", "TODO") as real content to act on
+    or mention, and (2) inventing a plausible-sounding answer when the
+    retrieved context is thin/placeholder instead of admitting uncertainty."""
+    doc = tmp_path / "placeholder.txt"
+    doc.write_text(
+        "This is a placeholder description of IEEE INSAT. TODO: replace this file before shipping.",
+        encoding="utf-8",
+    )
+    backend = fake_backend(reply="I don't have verified information about that yet.")
+
+    a = Assistant(llm=backend)
+    a.add_documents(str(doc))
+    a.chat("What is IEEE INSAT?")
+
+    sent_messages = backend.calls[-1]["messages"]
+    system_message = sent_messages[0]["content"].lower()
+    user_message = sent_messages[-1]["content"].lower()
+
+    assert sent_messages[0]["role"] == "system"
+    # the placeholder chunk was actually retrieved into the prompt...
+    assert "placeholder" in user_message
+    assert "replace this file" in user_message
+    # ...but the system prompt tells the model not to act on/repeat text
+    # like that, and to admit uncertainty instead of inventing an answer
+    assert "only using facts stated in the retrieved context" in system_message
+    assert "i don't have verified information about that yet" in system_message
+    assert "placeholder" in system_message
+    assert "todo" in system_message
+    assert "replace this file" in system_message
+
+
+def test_voice_chat_requires_stt(isolated_vector_store, fake_backend):
     a = Assistant(llm=fake_backend())
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(ValueError):
         a.voice_chat()
 
 
-def test_stt_and_tts_are_stubs_when_enabled(isolated_vector_store, fake_backend):
+def test_voice_chat_answers_the_question_that_followed_the_wake_word(isolated_vector_store, fake_backend, monkeypatch):
+    """wake word -> STT -> chat() -- the pipeline voice_chat is required to reuse, not reimplement."""
+    backend = fake_backend(reply="IEEE INSAT is the IEEE student branch at INSAT.")
+    a = Assistant(llm=backend, stt=True)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "what is IEEE INSAT?")
+
+    answer = a.voice_chat()
+
+    assert answer == "IEEE INSAT is the IEEE student branch at INSAT."
+    assert backend.calls[-1]["messages"][-1]["content"] == "what is IEEE INSAT?"
+
+
+def test_voice_chat_speaks_the_reply_when_tts_enabled(isolated_vector_store, fake_backend, monkeypatch):
+    a = Assistant(llm=fake_backend(reply="some answer"), stt=True, tts=True)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "a question")
+    spoken = []
+    monkeypatch.setattr(a.tts, "speak", lambda text: spoken.append(text))
+
+    a.voice_chat()
+
+    assert spoken == ["some answer"]
+
+
+def test_stt_and_tts_are_constructed_when_enabled(isolated_vector_store, fake_backend):
     a = Assistant(llm=fake_backend(), stt=True, tts=True)
 
     assert a.stt is not None
-    with pytest.raises(NotImplementedError):
-        a.stt.listen()
-
+    assert a.wake_word_detector is not None
+    assert a.hal is not None
     assert a.tts.enabled is True
-    with pytest.raises(NotImplementedError):
-        a.tts.speak("hello")
+
+
+class _StopLoop(Exception):
+    """Sentinel to break out of listen_loop's `while True` from inside a test."""
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_survives_a_bad_turn_and_keeps_listening(
+    isolated_vector_store, fake_backend, monkeypatch, caplog
+):
+    """One turn raising (LLM hiccup, transient STT error, ...) must not kill the loop."""
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True)
+
+    attempts = iter(["boom", "a real question"])
+
+    def flaky_listen_for_wake_word(audio_blocks):
+        question = next(attempts)
+        if question == "boom":
+            raise RuntimeError("boom")
+        return question
+
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", flaky_listen_for_wake_word)
+
+    results = []
+
+    def on_result(payload):
+        results.append(payload)
+        raise _StopLoop
+
+    with caplog.at_level("ERROR", logger="smartmirror.assistant.assistant"):
+        with pytest.raises(_StopLoop):
+            await a.listen_loop(on_result=on_result)
+
+    # the failed turn was logged, not silently swallowed or fatal
+    assert any("Voice turn failed" in message for message in caplog.messages)
+    # and the loop moved on to the next turn instead of dying
+    assert results == [{"transcript": "a real question", "answer": "the answer"}]
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_runs_turns_and_reports_each_via_on_result(isolated_vector_store, fake_backend, monkeypatch):
+    """wake_window_seconds=None: each turn is independently wake-word-gated,
+    which is what this test is about -- the wake window itself is covered
+    separately below."""
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=None)
+    questions = iter(["what is IEEE INSAT?", "what time is it?"])
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: next(questions))
+
+    results = []
+
+    def on_result(payload):
+        results.append(payload)
+        if len(results) >= 2:
+            raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(on_result=on_result)
+
+    assert results == [
+        {"transcript": "what is IEEE INSAT?", "answer": "the answer"},
+        {"transcript": "what time is it?", "answer": "the answer"},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_supports_an_async_on_result_callback(isolated_vector_store, fake_backend, monkeypatch):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "a question")
+
+    results = []
+
+    async def on_result(payload):
+        results.append(payload)
+        raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(on_result=on_result)
+
+    assert results == [{"transcript": "a question", "answer": "the answer"}]
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_requires_stt(isolated_vector_store, fake_backend):
+    a = Assistant(llm=fake_backend())
+    with pytest.raises(ValueError):
+        await a.listen_loop()
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_uses_the_hal_passed_in_over_the_default(isolated_vector_store, fake_backend, monkeypatch):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "a question")
+
+    other_hal = MagicMock()
+    other_hal.read_audio.return_value = iter([])
+
+    def on_result(payload):
+        raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(hal=other_hal, on_result=on_result)
+
+    assert a.hal is other_hal
+
+
+def test_default_wake_window_is_180_seconds(isolated_vector_store, fake_backend):
+    a = Assistant(llm=fake_backend(), stt=True)
+    assert a.wake_window_seconds == 180
+
+
+def test_wake_window_seconds_zero_disables_the_window(isolated_vector_store, fake_backend):
+    a = Assistant(llm=fake_backend(), stt=True, wake_window_seconds=0)
+    assert a.wake_window_seconds is None
+
+
+@pytest.mark.asyncio
+async def test_wake_window_opens_after_a_match_and_skips_the_wake_word_on_the_next_turn(
+    isolated_vector_store, fake_backend, monkeypatch, caplog
+):
+    """After a successful turn, the *next* turn must go through stt.listen()
+    (no wake word needed) instead of wake_word_detector.listen_for_wake_word
+    again.
+
+    _StopLoop is raised from on_result, not from inside a mocked
+    wake_word_detector/stt call -- listen_loop's per-turn try/except (see
+    test_listen_loop_survives_a_bad_turn_and_keeps_listening) would catch,
+    log, and swallow an exception raised from inside _voice_turn instead of
+    letting it end the test.
+    """
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=60)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "first question")
+
+    continued_calls = []
+
+    def fake_stt_listen(hal, deadline=None):
+        continued_calls.append(deadline)
+        return "second question"
+
+    monkeypatch.setattr(a.stt, "listen", fake_stt_listen)
+
+    turns = []
+
+    def on_result(payload):
+        turns.append(payload)
+        if len(turns) >= 2:
+            raise _StopLoop
+
+    with caplog.at_level("INFO", logger="smartmirror.assistant.assistant"):
+        with pytest.raises(_StopLoop):
+            await a.listen_loop(on_result=on_result)
+
+    assert len(continued_calls) == 1
+    assert continued_calls[0] is not None  # a real deadline was passed through
+    assert turns[1] == {"transcript": "second question", "answer": "the answer"}
+    assert any("Wake window open until" in message for message in caplog.messages)
+
+
+@pytest.mark.asyncio
+async def test_wake_window_closes_after_inactivity_and_requires_wake_word_again(
+    isolated_vector_store, fake_backend, monkeypatch, caplog
+):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=0.05)
+
+    wake_word_calls = []
+
+    def fake_wake_word(audio_blocks):
+        wake_word_calls.append(1)
+        return "first question" if len(wake_word_calls) == 1 else "second wake-word question"
+
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", fake_wake_word)
+
+    def fake_stt_listen(hal, deadline=None):
+        # simulate genuine inactivity: nothing heard before the deadline
+        time.sleep(max(0.0, deadline - time.monotonic()))
+        return ""
+
+    monkeypatch.setattr(a.stt, "listen", fake_stt_listen)
+
+    def on_result(payload):
+        if len(wake_word_calls) >= 2:
+            raise _StopLoop
+
+    with caplog.at_level("INFO", logger="smartmirror.assistant.assistant"):
+        with pytest.raises(_StopLoop):
+            await a.listen_loop(on_result=on_result)
+
+    # required again after the window closed from inactivity
+    assert len(wake_word_calls) == 2
+    assert any("Wake window closed, listening for" in message for message in caplog.messages)
+
+
+@pytest.mark.asyncio
+async def test_wake_window_deadline_resets_on_each_continued_turn(isolated_vector_store, fake_backend, monkeypatch):
+    """"reset on activity" per the design: every turn inside the window pushes
+    the deadline further out, rather than closing at a fixed time from when
+    the window first opened."""
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=60)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "first question")
+
+    deadlines_seen = []
+    responses = iter(["second question", "third question"])
+
+    def fake_stt_listen(hal, deadline=None):
+        deadlines_seen.append(deadline)
+        return next(responses)
+
+    monkeypatch.setattr(a.stt, "listen", fake_stt_listen)
+
+    turns = []
+
+    def on_result(payload):
+        turns.append(payload)
+        if len(turns) >= 3:
+            raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(on_result=on_result)
+
+    assert len(deadlines_seen) == 2
+    assert deadlines_seen[1] > deadlines_seen[0]
+
+
+@pytest.mark.asyncio
+async def test_wake_window_disabled_always_requires_the_wake_word(isolated_vector_store, fake_backend, monkeypatch):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=None)
+
+    wake_word_calls = []
+
+    def fake_wake_word(audio_blocks):
+        wake_word_calls.append(1)
+        return "a question"
+
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", fake_wake_word)
+
+    def on_result(payload):
+        if len(wake_word_calls) >= 2:
+            raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(on_result=on_result)
+
+    assert len(wake_word_calls) == 2  # never skipped, no window ever opens
 
 
 def test_tts_disabled_by_default_is_a_silent_no_op(isolated_vector_store, fake_backend):

@@ -2,9 +2,36 @@ from smartmirror.smartmirror import SmartMirrorServer
 from smartmirror.ui import WeatherWidget, CalendarWidget, NewsWidget, TextWidget, QRCodeGalleryWidget
 from smartmirror.runtime.data_providers import QRCodeCatalogProvider, MongoCalendarProvider
 from smartmirror.config.state_manager import StateManager
+from smartmirror.assistant import Assistant
+from smartmirror.assistant.llm import OpenAICompatBackend
 
 import asyncio
+import logging
 import os
+from pathlib import Path
+
+# INFO on the smartmirror.* loggers surfaces the voice pipeline's own
+# play-by-play (VAD detections, raw Whisper transcripts, wake-word
+# match/no-match) -- see scripts/voice_pipeline_manual_test.md for what to
+# expect. Root stays at WARNING so third-party libraries (httpx,
+# sentence_transformers, pywhispercpp, ...) don't drown it out.
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.getLogger("smartmirror").setLevel(logging.INFO)
+
+
+def build_assistant():
+    """Ollama-backed by default so this runs without a paid API key -- pull a
+    model first (e.g. `ollama pull qwen2.5:0.5b`) and start `ollama serve`.
+    Override via env vars to point at OpenAI or any other OpenAI-compatible
+    endpoint instead.
+    """
+    backend = OpenAICompatBackend(
+        api_key=os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama"),
+        base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1"),
+        model=os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b"),
+    )
+    seed_corpus = Path(__file__).resolve().parent.parent / "smartmirror" / "assistant" / "rag" / "seed_corpus"
+    return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
 
 
 def fallback_calendar_provider(_widget=None):
@@ -93,9 +120,14 @@ if __name__ == "__main__":
         ],
     )
 
+    assistant_widget = TextWidget(
+        position={"x": 0.1, "y": 0.85},
+        content='Say "ABDOU, <question>" to ask the assistant.',
+    )
+
     graph = {
         "nodes": [
-            {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery]},
+            {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery, assistant_widget]},
             {"id": "focus", "widgets": [focus_text]},
         ],
         "edges": [
@@ -128,8 +160,9 @@ if __name__ == "__main__":
         state_manager=state_manager,
         with_ui=True,
         with_camera=True,
-        with_microphone=False,
-        assistant=None,
+        with_microphone=True,
+        assistant=build_assistant(),
+        assistant_widget=assistant_widget,
         edit_gesture=None,
     )
     asyncio.run(server.run())
