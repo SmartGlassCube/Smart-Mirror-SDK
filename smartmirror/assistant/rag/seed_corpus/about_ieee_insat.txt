@@ -1,0 +1,5 @@
+IEEE INSAT is the IEEE Student Branch of the National Institute of Applied
+Science and Technology (INSAT) in Tunis, Tunisia. It is a placeholder
+description used to seed the assistant's retrieval-augmented generation
+pipeline during phase 1 development. Replace this file with real content
+before shipping.

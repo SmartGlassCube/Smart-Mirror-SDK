@@ -1,0 +1,3 @@
+from .piper import DEFAULT_VOICE, DEFAULT_VOICES_DIR, PiperTTS
+
+__all__ = ["PiperTTS", "DEFAULT_VOICE", "DEFAULT_VOICES_DIR"]

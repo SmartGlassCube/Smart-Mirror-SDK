@@ -1,6 +1,10 @@
 import asyncio
+import logging
 import os
+from pathlib import Path
 
+from smartmirror.assistant import Assistant
+from smartmirror.assistant.llm import OpenAICompatBackend
 from smartmirror.core import StateManager
 from smartmirror.server import SmartMirrorServer
 from smartmirror.widgets import (
@@ -14,12 +18,35 @@ from smartmirror.widgets import (
 )
 from smartmirror.widgets.providers import MongoCalendarProvider, OpenMeteoWeatherProvider, QRCodeCatalogProvider
 
+# INFO on the smartmirror.* loggers surfaces the voice pipeline's own
+# play-by-play (VAD detections, raw Whisper transcripts, wake-word
+# match/no-match) -- see scripts/voice_pipeline_manual_test.md for what to
+# expect. Root stays at WARNING so third-party libraries (httpx,
+# sentence_transformers, pywhispercpp, ...) don't drown it out.
+logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+logging.getLogger("smartmirror").setLevel(logging.INFO)
+
 try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
     from dotenv import load_dotenv
 
     load_dotenv()
 except ImportError:
     pass
+
+
+def build_assistant():
+    """Ollama-backed by default so this runs without a paid API key -- pull a
+    model first (e.g. `ollama pull qwen2.5:0.5b`) and start `ollama serve`.
+    Override via env vars to point at OpenAI or any other OpenAI-compatible
+    endpoint instead.
+    """
+    backend = OpenAICompatBackend(
+        api_key=os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama"),
+        base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1"),
+        model=os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b"),
+    )
+    seed_corpus = Path(__file__).resolve().parent.parent / "smartmirror" / "assistant" / "rag" / "seed_corpus"
+    return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
 
 
 def fallback_calendar_provider():
@@ -30,6 +57,7 @@ def fallback_calendar_provider():
             {"title": "Daily Wrap", "start": "2026-03-15T18:00:00"},
         ]
     }
+
 
 if __name__ == "__main__":
     mongo_uri = os.getenv("SMARTMIRROR_MONGO_READ_URI")
@@ -176,5 +204,10 @@ if __name__ == "__main__":
         },
     )
 
-    server = SmartMirrorServer(state_manager=state_manager, with_frontend=True, with_camera=True)
+    server = SmartMirrorServer(
+        state_manager=state_manager,
+        with_frontend=True,
+        with_camera=True,
+        assistant=build_assistant(),
+    )
     asyncio.run(server.run())
