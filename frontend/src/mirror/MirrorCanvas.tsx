@@ -1,0 +1,62 @@
+import './mirror.css'
+import { useCallback, useRef, useState } from 'react'
+import Abdo, { type AbdoHandle } from '../assistant/Abdo'
+import { useWebSocket } from '../services/useWebSocket'
+import type { BackendMessage, CameraFrame, MirrorState } from '../types/mirror'
+import CameraPreview from './CameraPreview'
+import HandCursor, { type HandCursorHandle } from './HandCursor'
+import PageView from './PageView'
+
+// On a page change Abdo says the page name, for this long after it has finished typing.
+const PAGE_NAME_HOLD_MS = 2000
+
+// "mini_games" -> "MINI GAMES"
+const pageName = (nodeId: string) => nodeId.replace(/[_-]+/g, ' ').toUpperCase()
+
+function MirrorCanvas() {
+  const [state, setState] = useState<MirrorState>({ nodeId: null, nodeIds: [], widgets: [] })
+  const [cameraFrame, setCameraFrame] = useState<CameraFrame | null>(null)
+  const abdoRef = useRef<AbdoHandle>(null)
+  const nodeIdRef = useRef<string | null>(null)
+  const cursorRef = useRef<HandCursorHandle>(null)
+
+  const onMessage = useCallback((message: BackendMessage) => {
+    if (message.type === 'CAMERA_FRAME') {
+      setCameraFrame(message)
+    } else if (message.type === 'POINTER') {
+      cursorRef.current?.move(message.position)
+    } else if (message.type === 'ASSISTANT_WAKE') {
+      abdoRef.current?.wake()
+    } else if (message.type === 'ASSISTANT_SAY') {
+      abdoRef.current?.say(message.text)
+    } else {
+      // A page change wakes Abdo and he says the new page's name; the first page after startup doesn't.
+      const previousNodeId = nodeIdRef.current
+      const nodeId = message.state.nodeId
+      nodeIdRef.current = nodeId
+      if (previousNodeId !== null && nodeId !== null && previousNodeId !== nodeId) {
+        abdoRef.current?.say(pageName(nodeId), PAGE_NAME_HOLD_MS)
+      }
+      setState(message.state)
+    }
+  }, [])
+  const { isConnected } = useWebSocket(onMessage)
+
+  const pageIndex = state.nodeId === null ? -1 : state.nodeIds.indexOf(state.nodeId)
+
+  return (
+    <div className="mirror-canvas">
+      <div className="mirror-status">
+        {isConnected ? 'Connected to backend' : 'Connecting to backend...'}
+        {state.nodeId ? ` | Page: ${state.nodeId}` : ''}
+        {pageIndex >= 0 ? ` (${pageIndex + 1}/${state.nodeIds.length})` : ''}
+      </div>
+      {isConnected && cameraFrame ? <CameraPreview frame={cameraFrame} /> : null}
+      <PageView key={state.nodeId ?? 'none'} widgets={state.widgets} />
+      <Abdo ref={abdoRef} />
+      {isConnected ? <HandCursor ref={cursorRef} /> : null}
+    </div>
+  )
+}
+
+export default MirrorCanvas

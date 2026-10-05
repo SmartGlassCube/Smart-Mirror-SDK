@@ -1,14 +1,22 @@
-from smartmirror.smartmirror import SmartMirrorServer
-from smartmirror.ui import WeatherWidget, CalendarWidget, NewsWidget, TextWidget, QRCodeGalleryWidget
-from smartmirror.runtime.data_providers import QRCodeCatalogProvider, MongoCalendarProvider
-from smartmirror.config.state_manager import StateManager
-from smartmirror.assistant import Assistant
-from smartmirror.assistant.llm import OpenAICompatBackend
-
 import asyncio
 import logging
 import os
 from pathlib import Path
+
+from smartmirror.assistant import Assistant
+from smartmirror.assistant.llm import OpenAICompatBackend
+from smartmirror.core import StateManager
+from smartmirror.server import SmartMirrorServer
+from smartmirror.widgets import (
+    CalendarWidget,
+    EventsWidget,
+    GamesWidget,
+    NewsWidget,
+    QRGalleryWidget,
+    TextWidget,
+    WeatherWidget,
+)
+from smartmirror.widgets.providers import MongoCalendarProvider, OpenMeteoWeatherProvider, QRCodeCatalogProvider
 
 # INFO on the smartmirror.* loggers surfaces the voice pipeline's own
 # play-by-play (VAD detections, raw Whisper transcripts, wake-word
@@ -17,6 +25,13 @@ from pathlib import Path
 # sentence_transformers, pywhispercpp, ...) don't drown it out.
 logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logging.getLogger("smartmirror").setLevel(logging.INFO)
+
+try:  # optional: `pip install -e ".[data]"` to read SMARTMIRROR_* settings from a .env file
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 
 def build_assistant():
@@ -34,7 +49,7 @@ def build_assistant():
     return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
 
 
-def fallback_calendar_provider(_widget=None):
+def fallback_calendar_provider():
     return {
         "events": [
             {"title": "Standup", "start": "2026-03-15T09:00:00"},
@@ -42,6 +57,7 @@ def fallback_calendar_provider(_widget=None):
             {"title": "Daily Wrap", "start": "2026-03-15T18:00:00"},
         ]
     }
+
 
 if __name__ == "__main__":
     mongo_uri = os.getenv("SMARTMIRROR_MONGO_READ_URI")
@@ -62,27 +78,27 @@ if __name__ == "__main__":
         {
             "tutorial": [
                 {
-                    "title": "Setup Guide",
+                    "title": "IEEE INSAT CS Social Media",
                     "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/tutorial/setup",
                     "url": "https://example.com/tutorial/setup",
-                },
-                {
-                    "title": "Gesture Basics",
-                    "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/tutorial/gestures",
-                    "url": "https://example.com/tutorial/gestures",
                 },
             ],
             "project": [
                 {
-                    "title": "Main Repo",
+                    "title": "Smart Mirror SDK",
                     "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/project/repo",
-                    "url": "https://example.com/project/repo",
+                    "url": "https://github.com/SmartGlassCube",
                 }
             ],
         }
     )
 
-    weather = WeatherWidget(position={"x": 0.1, "y": 0.2}, content="Static weather placeholder")
+    # Live weather for Tunis from Open-Meteo (free, no API key), refreshed every 10 minutes.
+    weather = WeatherWidget(
+        position={"x": 0.1, "y": 0.2},
+        data_provider=OpenMeteoWeatherProvider(city="Tunis", latitude=36.8065, longitude=10.1815),
+        refresh_interval=600,
+    )
     calendar = CalendarWidget(
         position={"x": 0.5, "y": 0.2},
         content=calendar_content,
@@ -104,7 +120,7 @@ if __name__ == "__main__":
             ],
         },
     )
-    qr_gallery = QRCodeGalleryWidget(
+    qr_gallery = QRGalleryWidget(
         position={"x": 0.8, "y": 0.5},
         content="QR links by category",
         data_provider=qr_provider,
@@ -120,24 +136,57 @@ if __name__ == "__main__":
         ],
     )
 
-    assistant_widget = TextWidget(
-        position={"x": 0.1, "y": 0.85},
-        content='Say "ABDOU, <question>" to ask the assistant.',
+    # Placeholder slots until the computer-vision games exist; give each one an "icon" image URL.
+    games = GamesWidget(
+        position={"x": 0.5, "y": 0.4},
+        games=[{"id": f"game-{n}", "title": "Coming soon"} for n in range(1, 7)],
+        draggable=False,
     )
 
+    # Placeholder cards until the club database exists. Later, pass a `data_provider`
+    # returning {"items": [{"id", "name", "description", "image"}]} instead of `items`.
+    events = EventsWidget(
+        position={"x": 0.5, "y": 0.4},
+        items=[
+            {"id": f"event-{n}", "name": "Event name", "description": "Description from the club database."}
+            for n in range(1, 4)
+        ],
+        draggable=False,
+    )
+
+    # Focus mode is not in the graph anymore. To bring it back, add `focus_page` to
+    # "nodes" and `focus_edges` to "edges" (and free up the swipe it uses from home).
+    focus_page = {"id": "focus", "widgets": [focus_text]}
+    focus_edges = [
+        {"from": "home", "to": "focus", "gesture": "two_fingers_swipe_left"},
+        {"from": "focus", "to": "home", "gesture": "two_fingers_swipe_right"},
+    ]
+
+    # games <-> home <-> events
     graph = {
         "nodes": [
-            {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery, assistant_widget]},
-            {"id": "focus", "widgets": [focus_text]},
+            {"id": "home", "widgets": [weather, calendar, news, text, qr_gallery]},
+            {"id": "games", "widgets": [games]},
+            {"id": "events", "widgets": [events]},
         ],
         "edges": [
             {
                 "from": "home",
-                "to": "focus",
+                "to": "games",
+                "gesture": "two_fingers_swipe_right",
+            },
+            {
+                "from": "games",
+                "to": "home",
                 "gesture": "two_fingers_swipe_left",
             },
             {
-                "from": "focus",
+                "from": "home",
+                "to": "events",
+                "gesture": "two_fingers_swipe_left",
+            },
+            {
+                "from": "events",
                 "to": "home",
                 "gesture": "two_fingers_swipe_right",
             },
@@ -156,13 +205,9 @@ if __name__ == "__main__":
     )
 
     server = SmartMirrorServer(
-        graph=graph,
         state_manager=state_manager,
-        with_ui=True,
+        with_frontend=True,
         with_camera=True,
-        with_microphone=True,
         assistant=build_assistant(),
-        assistant_widget=assistant_widget,
-        edit_gesture=None,
     )
     asyncio.run(server.run())

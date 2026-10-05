@@ -1,0 +1,59 @@
+/* 8-bit speech bubble (see SpeechBubble.tsx). The pixel frame is a 9x9 image drawn 4x. */
+.speech-bubble {
+  position: relative;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(calc(var(--u) * 640), calc(100vw - var(--px) * 8));
+  padding: var(--px) calc(var(--px) * 4);
+  border: calc(var(--px) * 4) solid transparent;
+  border-image-slice: 4 fill;
+  border-image-width: calc(var(--px) * 4);
+  image-rendering: pixelated;
+  color: var(--px-black);
+  filter: drop-shadow(var(--px) var(--px) 0 var(--px-indigo));
+  pointer-events: none;
+}
+
+/* Sits above the frame's top edge; top = -(frame border + tail rows above the frame). */
+.speech-bubble__tail {
+  position: absolute;
+  top: calc(var(--px) * -8);
+  left: 50%;
+  width: calc(var(--px) * 9);
+  height: calc(var(--px) * 6);
+  background-size: 100% 100%;
+  transform: translateX(-50%);
+}
+
+/* Up to two lines; longer text scrolls (SpeechBubble keeps the typed line in view). */
+.speech-bubble__text {
+  position: relative;
+  max-height: 2.4em;
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.speech-bubble__text p {
+  margin: 0;
+}
+
+.speech-bubble__pending {
+  visibility: hidden;
+}
+
+/* Blinking "next" arrow once the text is out. */
+.speech-bubble__next {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  border-top: calc(var(--px) * 2) solid var(--px-black);
+  border-right: calc(var(--px) * 1.5) solid transparent;
+  border-left: calc(var(--px) * 1.5) solid transparent;
+  animation: speech-bubble-next-blink 0.8s steps(1) infinite;
+}
+
+@keyframes speech-bubble-next-blink {
+  50% {
+    opacity: 0;
+  }
+}
