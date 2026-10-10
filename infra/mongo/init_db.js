@@ -1,4 +1,4 @@
-// init_db.js — contract v0.1 in code. Idempotent: safe to re-run.
+// init_db.js — contract v0.2 in code. Idempotent: safe to re-run.
 // Run: mongosh "mongodb://localhost:27017/?directConnection=true" init_db.js
 
 const ieee = db.getSiblingDB("ieee");
@@ -75,3 +75,36 @@ ensure("board", {
   order: { bsonType: "int" },
   email: { bsonType: "string" },
 }, ["name", "role", "term", "order"], [[{ order: 1 }]]);
+
+// mirror_status (v0.2): written by the mirror, no draft/published lifecycle --
+// exempt from ensure()'s common-fields schema, so it gets its own validator.
+function ensureMirrorStatus() {
+  const opts = {
+    validator: {
+      $jsonSchema: {
+        bsonType: "object",
+        required: ["mirror_id", "last_seen", "uptime_s", "updated_at"],
+        properties: {
+          mirror_id: str,
+          last_seen: date,
+          uptime_s: { bsonType: ["double", "int", "long"] },
+          current_page: { bsonType: ["string", "null"] },
+          last_sync_at: { bsonType: ["date", "null"] },
+          last_error: { bsonType: ["string", "null"] },
+          updated_at: date,
+        },
+      },
+    },
+    validationLevel: "strict",
+    validationAction: "error",
+  };
+  const name = "mirror_status";
+  if (ieee.getCollectionNames().includes(name)) {
+    ieee.runCommand({ collMod: name, ...opts });
+  } else {
+    ieee.createCollection(name, opts);
+  }
+  ieee[name].createIndex({ mirror_id: 1 }, { unique: true });
+  print(`ok: ${name}`);
+}
+ensureMirrorStatus();

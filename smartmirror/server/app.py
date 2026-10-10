@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import threading
 import time
 
 import cv2
@@ -12,6 +14,8 @@ from .frontend_launcher import FrontendLauncher
 from .hand_pointer import HandPointer
 from .websocket import ClientHub
 from .widget_data import refresh_widget_data
+
+logger = logging.getLogger(__name__)
 
 
 class SmartMirrorServer:
@@ -40,6 +44,7 @@ class SmartMirrorServer:
         frontend_port=5173,
         hardware=None,
         assistant=None,
+        content_sync=None,
         widget_update_tick=0.5,
     ):
         if state_manager is None:
@@ -67,6 +72,10 @@ class SmartMirrorServer:
         # Reserved for upcoming hardware / voice-assistant integrations.
         self.hardware = hardware or HAL()
         self.assistant = assistant
+        # Opt-in Mongo content sync (smartmirror.content) -- None (default)
+        # means the mirror behaves exactly as before. See examples/mvp.py.
+        self.content_sync = content_sync
+        self._content_sync_stop = threading.Event()
 
         self.widget_update_tick = widget_update_tick
         self.hub = ClientHub(state_manager)
@@ -79,13 +88,27 @@ class SmartMirrorServer:
             async with websockets.serve(self.hub.handle_client, self.ws_host, self.ws_port):
                 if self.frontend is not None:
                     await self.frontend.start()
-                await self._main_loop()
+                tasks = [self._main_loop()]
+                if self.content_sync is not None:
+                    tasks.append(self._content_sync_loop())
+                await asyncio.gather(*tasks, return_exceptions=True)
         finally:
             if self.frontend is not None:
                 await self.frontend.stop()
+            self._content_sync_stop.set()
+
+    async def _content_sync_loop(self):
+        try:
+            await self.content_sync.run_forever(
+                current_page_getter=lambda: self.state_manager.current_node_id,
+                stop_event=self._content_sync_stop,
+            )
+        except Exception:
+            logger.exception("Content sync loop failed")
 
     def stop(self):
         self.running = False
+        self._content_sync_stop.set()
 
     # Hooks for the voice chatbot (RAG), shown by the Abdo avatar in the frontend.
     def assistant_wake(self):

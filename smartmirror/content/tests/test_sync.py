@@ -1,0 +1,233 @@
+"""Integration tests against a real local Mongo (see conftest.requires_mongo).
+
+Run: ./infra/mongo/dev_mongod.sh start && uv run pytest smartmirror/content/tests -q
+"""
+import threading
+import time
+from datetime import timedelta
+
+from .conftest import make_about, make_announcement, make_event, requires_mongo, utcnow
+
+pytestmark = requires_mongo
+
+
+def _retrieve_sources(content_sync, query, top_k=10):
+    from smartmirror.assistant.rag import Retriever
+    retriever = Retriever(store=content_sync.indexer.store, embedder=content_sync.indexer.embedder, top_k=top_k)
+    [query_embedding] = content_sync.indexer.embedder.embed(query)
+    return {r["source"] for r in content_sync.indexer.store.query(query_embedding, top_k=top_k)}
+
+
+def test_reconcile_inserts_appear_in_cache_and_qdrant(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Robotics Night")
+    content_sync.reconcile()
+
+    cached = content_sync.cache.docs("events")
+    assert str(doc_id) in cached
+    assert cached[str(doc_id)]["title"] == "Robotics Night"
+
+    sources = _retrieve_sources(content_sync, "Robotics Night")
+    assert f"events:{doc_id}" in sources
+
+
+def test_reconcile_update_replaces_old_chunks(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Original Title", description="Original description about lasers.")
+    content_sync.reconcile()
+    assert "Original" in str(content_sync.cache.docs("events")[str(doc_id)]["title"])
+
+    mongo_db.events.update_one({"_id": doc_id}, {"$set": {
+        "title": "Updated Title", "description": "Updated description about rockets.", "updated_at": utcnow(),
+    }})
+    content_sync.reconcile()
+
+    cached = content_sync.cache.docs("events")[str(doc_id)]
+    assert cached["title"] == "Updated Title"
+
+    [query_embedding] = content_sync.indexer.embedder.embed("rockets")
+    results = content_sync.indexer.store.query(query_embedding, top_k=5)
+    matching = [r for r in results if r["source"] == f"events:{doc_id}"]
+    assert matching, "updated chunk not found"
+    assert "rockets" in matching[0]["text"]
+    assert "lasers" not in matching[0]["text"]
+
+
+def test_reconcile_delete_removes_from_cache_and_qdrant(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Soon To Be Deleted")
+    content_sync.reconcile()
+    assert str(doc_id) in content_sync.cache.docs("events")
+
+    mongo_db.events.delete_one({"_id": doc_id})
+    content_sync.reconcile()
+
+    assert str(doc_id) not in content_sync.cache.docs("events")
+    sources = _retrieve_sources(content_sync, "Soon To Be Deleted")
+    assert f"events:{doc_id}" not in sources
+
+
+def test_reconcile_published_to_draft_removed(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Flip Flopper")
+    content_sync.reconcile()
+    assert str(doc_id) in content_sync.cache.docs("events")
+
+    mongo_db.events.update_one({"_id": doc_id}, {"$set": {"status": "draft", "updated_at": utcnow()}})
+    content_sync.reconcile()
+
+    assert str(doc_id) not in content_sync.cache.docs("events")
+    sources = _retrieve_sources(content_sync, "Flip Flopper")
+    assert f"events:{doc_id}" not in sources
+
+
+def test_reconcile_draft_never_indexed(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Never Published", status="draft")
+    content_sync.reconcile()
+
+    assert str(doc_id) not in content_sync.cache.docs("events")
+    sources = _retrieve_sources(content_sync, "Never Published")
+    assert f"events:{doc_id}" not in sources
+
+
+def test_expired_announcement_not_in_widget_but_in_qdrant(mongo_db, content_sync):
+    doc_id = make_announcement(
+        mongo_db, title="Old News", body="This announcement has expired.",
+        publish_at=utcnow() - timedelta(days=30), expires_at=utcnow() - timedelta(days=10),
+    )
+    content_sync.reconcile()
+
+    widget_titles = [a["title"] for a in content_sync.widget_data("announcements")]
+    assert "Old News" not in widget_titles
+
+    sources = _retrieve_sources(content_sync, "Old News")
+    assert f"announcements:{doc_id}" in sources
+
+
+def test_past_event_not_in_widget_but_in_qdrant(mongo_db, content_sync):
+    doc_id = make_event(mongo_db, title="Historical Assembly", start=utcnow() - timedelta(days=100))
+    content_sync.reconcile()
+
+    widget_titles = [e["title"] for e in content_sync.widget_data("events")]
+    assert "Historical Assembly" not in widget_titles
+
+    sources = _retrieve_sources(content_sync, "Historical Assembly")
+    assert f"events:{doc_id}" in sources
+
+
+def test_offline_gap_reconcile_catches_up(mongo_db, content_sync):
+    """Simulates: watcher stopped, docs changed while offline, mirror restarts -> reconcile catches up."""
+    doc_id = make_event(mongo_db, title="Before Gap")
+    content_sync.reconcile()
+    assert str(doc_id) in content_sync.cache.docs("events")
+
+    # "offline": no watch() running. Mutate Mongo directly.
+    mongo_db.events.delete_one({"_id": doc_id})
+    new_id = make_event(mongo_db, title="Created While Offline")
+
+    # "restart": fresh reconcile catches both changes.
+    content_sync.reconcile()
+    cached = content_sync.cache.docs("events")
+    assert str(doc_id) not in cached
+    assert str(new_id) in cached
+    assert cached[str(new_id)]["title"] == "Created While Offline"
+
+
+def test_invalid_resume_token_triggers_reconcile(mongo_db, content_sync):
+    make_event(mongo_db, title="Seed Before Bad Token")
+    content_sync.reconcile()
+    assert len(content_sync.cache.docs("events")) == 1
+
+    content_sync.cache.set_resume_token({"_data": "00" * 40})  # well-formed-looking but bogus/stale
+
+    stop_event = threading.Event()
+    watch_thread = threading.Thread(target=content_sync.watch, args=(stop_event,), daemon=True)
+    watch_thread.start()
+    try:
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and content_sync.last_sync_at is None:
+            time.sleep(0.2)
+        assert content_sync.last_sync_at is not None, "watch() never reconciled after an invalid resume token"
+    finally:
+        stop_event.set()
+        watch_thread.join(timeout=5)
+
+
+def test_watch_observes_insert_update_delete(mongo_db, content_sync):
+    content_sync.reconcile()
+
+    stop_event = threading.Event()
+    watch_thread = threading.Thread(target=content_sync.watch, args=(stop_event,), daemon=True)
+    watch_thread.start()
+    try:
+        time.sleep(1)  # let the change stream subscribe before we write
+        doc_id = make_event(mongo_db, title="Live Inserted")
+
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and str(doc_id) not in content_sync.cache.docs("events"):
+            time.sleep(0.2)
+        assert str(doc_id) in content_sync.cache.docs("events"), "insert not observed by watch()"
+
+        mongo_db.events.delete_one({"_id": doc_id})
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and str(doc_id) in content_sync.cache.docs("events"):
+            time.sleep(0.2)
+        assert str(doc_id) not in content_sync.cache.docs("events"), "delete not observed by watch()"
+    finally:
+        stop_event.set()
+        watch_thread.join(timeout=5)
+
+
+def test_embedding_model_mismatch_triggers_full_rebuild(mongo_db, content_sync):
+    make_event(mongo_db, title="Rebuild Me")
+    content_sync.reconcile()
+    sidecar = content_sync.config.cache_dir / "embedding_model.json"
+    assert sidecar.exists()
+
+    import json
+    stale = json.loads(sidecar.read_text())
+    stale["model"] = "a-different-model"
+    sidecar.write_text(json.dumps(stale))
+
+    # Simulate boot with the real (unchanged) embedder but a stale sidecar: should rebuild, not crash.
+    content_sync.reconcile()
+    current = json.loads(sidecar.read_text())
+    assert current["model"] == content_sync.indexer.embedder.model_name
+
+
+def test_heartbeat_upserts_mirror_status(mongo_db, content_sync):
+    content_sync.heartbeat(current_page="home")
+    doc = mongo_db.mirror_status.find_one({"mirror_id": content_sync.config.mirror_id})
+    assert doc is not None
+    assert doc["current_page"] == "home"
+    assert doc["last_seen"] is not None
+
+
+def test_prompt_block_assembles_from_cache(mongo_db, content_sync):
+    make_event(mongo_db, title="Prompt Event")
+    make_announcement(mongo_db, title="Prompt Announcement")
+    make_about(mongo_db)
+    content_sync.reconcile()
+
+    block = content_sync.prompt_block()
+    assert "Prompt Event" in block
+    assert "Prompt Announcement" in block
+    assert "Test mission body." in block
+
+
+def test_mongo_down_does_not_raise(cache_dir, qdrant_collection, shared_embedder, tmp_path):
+    from smartmirror.assistant.rag import VectorStore
+    from smartmirror.content.cache import ContentCache
+    from smartmirror.content.config import ContentSyncConfig
+    from smartmirror.content.indexer import ContentIndexer
+    from smartmirror.content.sync import ContentSync
+
+    config = ContentSyncConfig()
+    config.mongo_uri = "mongodb://127.0.0.1:1/?directConnection=true&serverSelectionTimeoutMS=200"
+    config.mongo_db = "doesnotmatter"
+    config.cache_dir = cache_dir
+
+    cache = ContentCache(cache_dir)
+    store = VectorStore(path=str(tmp_path / "qdrant"), collection_name=qdrant_collection)
+    indexer = ContentIndexer(store=store, embedder=shared_embedder)
+    sync = ContentSync(config, cache, indexer)
+
+    sync.reconcile()  # must not raise
+    assert sync.last_error is not None
+    sync.client.close()

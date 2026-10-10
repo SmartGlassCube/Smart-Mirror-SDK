@@ -64,10 +64,17 @@ class Assistant:
         wake_window_seconds=DEFAULT_WAKE_WINDOW_SECONDS,
         system_prompt=None,
         language="en",
+        store=None,
+        extra_context=None,
     ):
         self.language = language
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
         self.wake_window_seconds = wake_window_seconds or None
+        # Called (no args) on every chat() turn and its return value (str) is
+        # spliced into the prompt ahead of retrieved chunks -- e.g. a Mongo
+        # content sync's routing.build_prompt_block (next events, active
+        # announcements, mission). None (default) adds nothing.
+        self.extra_context = extra_context
 
         backend = llm or (OpenAICompatBackend(api_key=api_key, base_url=url, model=model) if api_key else None)
         if backend is None:
@@ -76,7 +83,7 @@ class Assistant:
 
         self.chunker = Chunker()
         self.embedder = Embedder()
-        self.store = VectorStore()
+        self.store = store or VectorStore()
         self.retriever = Retriever(store=self.store, embedder=self.embedder)
 
         self.hal = hal or (HAL() if (stt or tts) else None)
@@ -225,8 +232,16 @@ class Assistant:
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(self.history)
 
+        context_sections = []
+        if self.extra_context is not None:
+            extra = self.extra_context()
+            if extra and extra.strip():
+                context_sections.append(extra.strip())
         if retrieved_chunks:
-            context = "\n\n".join(f"- {chunk}" for chunk in retrieved_chunks)
+            context_sections.append("\n\n".join(f"- {chunk}" for chunk in retrieved_chunks))
+
+        if context_sections:
+            context = "\n\n".join(context_sections)
             user_content = (
                 f"Context:\n{context}\n\nQuestion: {message}"
             )

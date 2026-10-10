@@ -1,4 +1,4 @@
-# Smart Mirror — Data Contract (v0.1)
+# Smart Mirror — Data Contract (v0.2)
 
 Shared agreement between the **dashboard** (writes) and the **mirror** (reads).
 Enforced in code by `init_db.js` (Mongo `$jsonSchema` validators).
@@ -71,6 +71,24 @@ One document per section. `key` is unique.
 | `term`  | string | yes | e.g. `2026-2027` |
 | `order` | int    | yes | display order |
 | `email` | string | no  | public club contact only |
+
+### `mirror_status` (v0.2)
+Written by the mirror (one doc per `mirror_id`, upserted), read by the dashboard.
+**Exempt from the common fields / `status` rule above** — it isn't board-authored
+content, has no draft/published lifecycle, and `init_db.js` validates it with its
+own schema instead of `ensure()`'s common-fields one.
+
+| field          | type   | req | notes |
+|----------------|--------|-----|-------|
+| `mirror_id`    | string | yes | unique |
+| `last_seen`    | Date   | yes | updated every heartbeat (~30s) |
+| `uptime_s`     | double | yes | process uptime |
+| `current_page` | string | no  | active page/node id |
+| `last_sync_at` | Date   | no  | last successful Mongo reconcile |
+| `last_error`   | string | no  | last sync/heartbeat error, if any |
+| `updated_at`   | Date   | yes | |
+
+The dashboard considers a mirror **online** if `last_seen` is within the last 90s.
 
 ## Routing (what the mirror does with each collection)
 

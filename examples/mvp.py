@@ -34,17 +34,28 @@ except ImportError:
     pass
 
 
-def build_assistant():
+def build_assistant(content_sync=None):
     """Ollama-backed by default so this runs without a paid API key -- pull a
     model first (e.g. `ollama pull qwen2.5:0.5b`) and start `ollama serve`.
     Override via env vars to point at OpenAI or any other OpenAI-compatible
     endpoint instead.
+
+    When `content_sync` is set (MONGO_URI env var present, see __main__),
+    the assistant retrieves from the Mongo-derived Qdrant collection and
+    gets the live events/announcements/mission prompt block instead of the
+    placeholder seed corpus.
     """
     backend = OpenAICompatBackend(
         api_key=os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama"),
         base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1"),
         model=os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b"),
     )
+    if content_sync is not None:
+        return Assistant(
+            llm=backend, stt=True, tts=True,
+            store=content_sync.indexer.store,
+            extra_context=content_sync.prompt_block,
+        )
     seed_corpus = Path(__file__).resolve().parent.parent / "smartmirror" / "assistant" / "rag" / "seed_corpus"
     return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
 
@@ -73,6 +84,15 @@ if __name__ == "__main__":
     else:
         calendar_provider = fallback_calendar_provider
         calendar_content = "Fallback local events (set SMARTMIRROR_MONGO_READ_URI for cloud)"
+
+    # Separate from the generic personal-calendar Mongo above: this is the IEEE
+    # INSAT club content sync (events/announcements/about/achievements/board),
+    # opt-in via MONGO_URI. See smartmirror/content/ and infra/mongo/CONTRACT.md.
+    content_sync = None
+    if os.getenv("MONGO_URI"):
+        from smartmirror.content import build_content_sync
+
+        content_sync = build_content_sync()
 
     qr_provider = QRCodeCatalogProvider(
         {
@@ -143,16 +163,29 @@ if __name__ == "__main__":
         draggable=False,
     )
 
-    # Placeholder cards until the club database exists. Later, pass a `data_provider`
-    # returning {"items": [{"id", "name", "description", "image"}]} instead of `items`.
-    events = EventsWidget(
-        position={"x": 0.5, "y": 0.4},
-        items=[
-            {"id": f"event-{n}", "name": "Event name", "description": "Description from the club database."}
-            for n in range(1, 4)
-        ],
-        draggable=False,
-    )
+    if content_sync is not None:
+        events = EventsWidget(
+            position={"x": 0.5, "y": 0.4},
+            data_provider=lambda _widget=None: {
+                "items": [
+                    {"id": f"events:{doc['_id']}", "name": doc["title"], "description": doc["description"]}
+                    for doc in content_sync.widget_data("events")
+                ]
+            },
+            refresh_interval=30,
+            draggable=False,
+        )
+    else:
+        # Placeholder cards until MONGO_URI is set. Later, pass a `data_provider`
+        # returning {"items": [{"id", "name", "description", "image"}]} instead of `items`.
+        events = EventsWidget(
+            position={"x": 0.5, "y": 0.4},
+            items=[
+                {"id": f"event-{n}", "name": "Event name", "description": "Description from the club database."}
+                for n in range(1, 4)
+            ],
+            draggable=False,
+        )
 
     # Focus mode is not in the graph anymore. To bring it back, add `focus_page` to
     # "nodes" and `focus_edges` to "edges" (and free up the swipe it uses from home).
@@ -208,6 +241,7 @@ if __name__ == "__main__":
         state_manager=state_manager,
         with_frontend=True,
         with_camera=True,
-        assistant=build_assistant(),
+        assistant=build_assistant(content_sync),
+        content_sync=content_sync,
     )
     asyncio.run(server.run())

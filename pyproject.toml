@@ -26,7 +26,8 @@ dev = [
   "pytest",
   "black",
   "mypy",
-  "ruff"
+  "ruff",
+  "pytest-asyncio>=1.2.0",
 ]
 data = [
   "pymongo>=4.7.0",
