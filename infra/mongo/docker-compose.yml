@@ -1,0 +1,34 @@
+# Local Mongo for dev: single-node replica set (needed for change streams).
+# Up:    docker compose up -d
+# Reset: docker compose down -v && docker compose up -d
+# Pi connects with: mongodb://<PC_LAN_IP>:27017/ieee?directConnection=true
+
+services:
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+    healthcheck:
+      # initiate RS on first boot; healthy only once this node is PRIMARY
+      test: >
+        mongosh --quiet --eval
+        "try { rs.status() } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}) };
+         quit(db.hello().isWritablePrimary ? 0 : 1)"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      mongo: { condition: service_healthy }
+    volumes: ["./:/scripts:ro"]
+    entrypoint: >
+      sh -c "mongosh 'mongodb://mongo:27017/?directConnection=true' /scripts/init_db.js &&
+             mongosh 'mongodb://mongo:27017/?directConnection=true' /scripts/seed.js"
+    restart: "no"
+
+volumes:
+  mongo-data: {}

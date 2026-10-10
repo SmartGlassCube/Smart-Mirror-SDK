@@ -30,7 +30,7 @@ dev = [
 ]
 data = [
   "pymongo>=4.7.0",
-  "python-dotenv>=1.0"
+  "python-dotenv>=1.0",
 ]
 assistant = [
   "openai>=1.0.0",
