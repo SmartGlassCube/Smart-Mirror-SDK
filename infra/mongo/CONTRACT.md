@@ -1,4 +1,4 @@
-# Smart Mirror — Data Contract (v0.2)
+# Smart Mirror — Data Contract (v0.3)
 
 Shared agreement between the **dashboard** (writes) and the **mirror** (reads).
 Enforced in code by `init_db.js` (Mongo `$jsonSchema` validators).
@@ -89,6 +89,31 @@ own schema instead of `ensure()`'s common-fields one.
 | `updated_at`   | Date   | yes | |
 
 The dashboard considers a mirror **online** if `last_seen` is within the last 90s.
+
+### `dashboard_users` (v0.3)
+Dashboard auth only. **The mirror never reads this collection.** Exempt from the
+common fields / `status` rule -- same reasoning as `mirror_status`.
+
+| field           | type   | req | notes |
+|-----------------|--------|-----|-------|
+| `username`      | string | yes | unique |
+| `password_hash` | string | yes | bcrypt |
+| `role`          | `"admin"` \| `"editor"` | yes | |
+| `created_at`    | Date   | yes | |
+| `updated_at`    | Date   | yes | |
+
+### `audit_log` (v0.3)
+Append-only, written by the dashboard backend on every content write. **The
+mirror never reads this collection.** Exempt from the common fields rule.
+
+| field        | type   | req | notes |
+|--------------|--------|-----|-------|
+| `username`   | string | yes | who made the change |
+| `collection` | string | yes | which of the 5 content collections |
+| `document_id`| string | yes | |
+| `operation`  | string | yes | `create` \| `update` \| `delete` \| `status:published` \| `status:draft` |
+| `at`         | Date   | yes | |
+| `changes`    | object | no  | optional free-form diff |
 
 ## Routing (what the mirror does with each collection)
 

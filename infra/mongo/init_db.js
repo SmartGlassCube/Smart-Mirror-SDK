@@ -1,4 +1,4 @@
-// init_db.js — contract v0.2 in code. Idempotent: safe to re-run.
+// init_db.js — contract v0.3 in code. Idempotent: safe to re-run.
 // Run: mongosh "mongodb://localhost:27017/?directConnection=true" init_db.js
 
 const ieee = db.getSiblingDB("ieee");
@@ -108,3 +108,47 @@ function ensureMirrorStatus() {
   print(`ok: ${name}`);
 }
 ensureMirrorStatus();
+
+// dashboard_users / audit_log (v0.3): dashboard-only, mirror never reads
+// these -- no draft/published lifecycle, so they get their own validators
+// too instead of ensure()'s common-fields one.
+function ensureSimple(name, schema) {
+  const opts = {
+    validator: { $jsonSchema: schema },
+    validationLevel: "strict",
+    validationAction: "error",
+  };
+  if (ieee.getCollectionNames().includes(name)) {
+    ieee.runCommand({ collMod: name, ...opts });
+  } else {
+    ieee.createCollection(name, opts);
+  }
+  print(`ok: ${name}`);
+}
+
+ensureSimple("dashboard_users", {
+  bsonType: "object",
+  required: ["username", "password_hash", "role", "created_at", "updated_at"],
+  properties: {
+    username: str,
+    password_hash: str,
+    role: { enum: ["admin", "editor"] },
+    created_at: date,
+    updated_at: date,
+  },
+});
+ieee.dashboard_users.createIndex({ username: 1 }, { unique: true });
+
+ensureSimple("audit_log", {
+  bsonType: "object",
+  required: ["username", "collection", "document_id", "operation", "at"],
+  properties: {
+    username: str,
+    collection: str,
+    document_id: str,
+    operation: str,
+    at: date,
+    changes: { bsonType: ["object", "null"] },
+  },
+});
+ieee.audit_log.createIndex({ at: -1 });
