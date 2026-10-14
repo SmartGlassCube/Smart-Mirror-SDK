@@ -1,7 +1,47 @@
 # Work report -- `./dev.sh` and the uv footgun fix
 
-Ran unattended (2026-10-14) on `amin/content-sync`, on top of the overnight
-session (`OVERNIGHT_REPORT.md`). One new commit, nothing pushed or merged.
+Ran on `amin/content-sync` (2026-10-14 -> 2026-10-15), on top of the
+overnight session (`OVERNIGHT_REPORT.md`). Three commits, nothing pushed or
+merged.
+
+## Addendum (2026-10-15): the dashboard wasn't actually reaching the RAG
+
+Asked directly: "does updating the db actually update the RAG, not just
+widgets?" -- it's a fair thing to not take on faith. Checked, and the honest
+answer at the time was **no, not continuously**: the dashboard writes
+straight to Mongo, but nothing was running the mirror's Mongo->Qdrant sync
+in the dev stack `./dev.sh up` brought up (that sync only runs inside
+`examples/mvp.py`, which `up` never started). Proved the gap concretely
+(created an event via the dashboard API, queried the assistant's retriever,
+got nothing back), then closed it: `scripts/content_sync_daemon.py` runs
+the same `ContentSync.reconcile()` + `.watch()` + heartbeat the mirror runs
+on boot, with no camera/gestures/UI attached, and `./dev.sh up` now starts
+it. Re-verified live end to end afterward -- see "Content-sync daemon
+verification" below. Commit: `dba4db1`.
+
+One real constraint surfaced along the way: Qdrant's embedded (local-mode)
+storage takes an **exclusive lock** on its directory (confirmed by trying
+to open the same path twice -- the second open raises). The standalone
+daemon and `examples/mvp.py`'s own internal sync can't both hold that lock
+at once, so `./dev.sh mirror` now stops the daemon first and `up` brings it
+back afterward, instead of the mirror app crashing on a lock error.
+
+### Content-sync daemon verification (exact steps, no manual reconcile)
+
+1. Logged into the dashboard API, `POST /api/announcements` with a new
+   published announcement ("Hackathon Registration Open").
+2. Within ~2s, `smartmirror/content/.cache/cache.json` contained it --
+   proof the **change-stream watcher** picked it up live, not a
+   reconcile-on-boot I triggered myself.
+3. Paused the daemon just long enough to safely open its Qdrant store from
+   a one-off script (can't open it while the daemon holds the lock) and
+   ran `Retriever.retrieve("Is hackathon registration open?")` -- the new
+   announcement came back as the top match.
+4. Deleted it via the API; the cache entry disappeared within ~2s, no
+   manual steps.
+5. Restarted the daemon with `./dev.sh up` (idempotent, as designed) and
+   re-ran `smartmirror/content/tests` (33 passed) to confirm nothing in the
+   shared `smartmirror.content` package regressed.
 
 ## Status: done
 
@@ -258,11 +298,30 @@ Carried over from `OVERNIGHT_REPORT.md` (still applies, not re-verified here):
   `FRONTEND_PORT` are constants at the top of `dev.sh`, not flags or env
   vars. Simple for now; shout if you ever need two stacks running side by
   side.
+- **`./dev.sh up` now installs the `data`+`assistant` extras (torch
+  included) on first run**, for the content-sync daemon's embedder. That's
+  a meaningfully heavier default footprint than before (`up` used to only
+  need the lightweight dashboard backend venv + frontend node_modules).
+  Accepted deliberately -- you asked for dashboard edits to reach the RAG
+  live, and that requires an embedding model running somewhere. The daemon
+  uses the GPU by default (same as the rest of the assistant stack); this
+  machine's GPU is small enough that heavy concurrent use elsewhere
+  (Ollama, the full mirror app) could still contend for it -- not observed
+  as an actual problem during this session's testing, just flagging the
+  same class of thing noted in `OVERNIGHT_REPORT.md`.
+- **The content-sync daemon and `examples/mvp.py` can't run at the same
+  time** (Qdrant's embedded storage lock, see above) -- `./dev.sh mirror`
+  handles this for you, but if you ever start the mirror app some other
+  way (not through `dev.sh`), stop the daemon first (`./dev.sh down`, or
+  just kill the pid in `.dev/pids/content-sync.pid`) or it'll fail to open
+  its Qdrant store.
 
 ## Commits
 
 ```
 400e21b Add ./dev.sh: one idempotent command for the whole dev stack
+cc83277 Add WORK_REPORT.md
+dba4db1 dev.sh up: start a standalone content-sync daemon too
 ```
 
 On top of the overnight session's 5 commits (`68c48a1`..`f821aa8`, see
