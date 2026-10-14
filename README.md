@@ -14,18 +14,21 @@ git clone <this repo> && cd Smart-Mirror-SDK
 
 No sudo, no manual Mongo/mongosh/user setup, ever -- `./dev.sh up` is idempotent,
 safe to re-run from any state (fresh clone, already running, after a reboot
-or a crash).
+or a crash). It also starts a standalone content-sync daemon (Mongo -> Qdrant),
+so editing content through the dashboard reaches the assistant's RAG and the
+mirror's cached widget data **live** -- not just Mongo. First run installs the
+`data`/`assistant` extras for that (torch included, can take a few minutes).
 
 | Command | What it does |
 |---|---|
-| `./dev.sh up [--sync-admin-password]` | Start Mongo + dashboard backend (`:8000`) + frontend (`:5174`). Reuses whatever's already running. |
-| `./dev.sh down` | Stop all three. |
-| `./dev.sh status` | Up/down, PRIMARY?, content doc counts, dashboard user list. |
-| `./dev.sh logs {mongo\|backend\|frontend}` | Tail that component's log. |
+| `./dev.sh up [--sync-admin-password]` | Start Mongo + content-sync daemon + dashboard backend (`:8000`) + frontend (`:5174`). Reuses whatever's already running. |
+| `./dev.sh down` | Stop all four. |
+| `./dev.sh status` | Up/down, PRIMARY?, last content sync, doc counts, dashboard user list. |
+| `./dev.sh logs {mongo\|backend\|frontend\|content-sync}` | Tail that component's log. |
 | `./dev.sh mongosh [args]` | Run the bundled mongosh against `MONGO_URI`. |
 | `./dev.sh reset-password <user> [pw]` | Set/create a password; omit it to get one generated. |
 | `./dev.sh reseed [--yes]` | **Destructive**: wipe + reseed dev content. |
-| `./dev.sh mirror` | Run `examples/mvp.py` with `MONGO_URI` from `.env`. |
+| `./dev.sh mirror` | Run the full camera-driven `examples/mvp.py` with `MONGO_URI` from `.env`. Stops the content-sync daemon first (Qdrant's local storage can't be held by both at once) -- `up` restarts it afterward. |
 | `./dev.sh install-autostart` / `uninstall-autostart` | A systemd `--user` unit to run Mongo at login (not enabled automatically). |
 
 See [OVERNIGHT_REPORT.md](OVERNIGHT_REPORT.md) and [WORK_REPORT.md](WORK_REPORT.md)
