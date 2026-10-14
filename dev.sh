@@ -22,6 +22,9 @@ FRONTEND_PORT=5174
 BACKEND_BIN="$BACKEND_DIR/.venv/bin/uvicorn"
 FRONTEND_BIN="$FRONTEND_DIR/node_modules/.bin/vite"
 
+CONTENT_SYNC_SCRIPT="$HERE/scripts/content_sync_daemon.py"
+CONTENT_SYNC_MIRROR_ID="dev-content-sync"
+
 ADMIN_PASSWORD_JUST_GENERATED=false
 
 log() { echo "dev.sh: $*"; }
@@ -75,6 +78,16 @@ wait_for_http() {
   return 1
 }
 
+wait_for_mongo_truthy() {
+  # wait_for_mongo_truthy <js-expression-that-prints-true-or-false> [tries]
+  local expr="$1" tries="${2:-60}"
+  for _ in $(seq 1 "$tries"); do
+    [ "$(dev_mongosh --quiet --eval "$expr" 2>/dev/null || true)" = "true" ] && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
 mongo_is_primary() {
   [ -x "$MONGOSH_BIN" ] || return 1
   "$MONGOSH_BIN" "mongodb://localhost:27017/?directConnection=true" --quiet --eval \
@@ -90,6 +103,7 @@ dev_mongosh() {
 
 backend_pattern() { echo "[.]venv/bin/uvicorn app\\.main:app.*--port $BACKEND_PORT"; }
 frontend_pattern() { echo "node_modules/[.]bin/vite .*--port $FRONTEND_PORT"; }
+content_sync_pattern() { echo "python.*scripts/content_sync_daemon\\.py"; }
 
 find_pid() {
   # find_pid <pidfile> <pgrep-pattern>
@@ -185,6 +199,33 @@ start_frontend() {
   log "frontend: up (pid $(cat "$PID_DIR/frontend.pid")) -- http://localhost:$FRONTEND_PORT"
 }
 
+ensure_root_venv_extras() {
+  if ! "$HERE/.venv/bin/python" -c "import pymongo, qdrant_client, sentence_transformers" >/dev/null 2>&1; then
+    log "content-sync: first run, installing data+assistant extras (pulls in torch -- can take a few minutes)..."
+    (cd "$HERE" && uv sync --extra data --extra assistant)
+  fi
+}
+
+start_content_sync() {
+  if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
+    log "content-sync: already running (pid $(cat "$PID_DIR/content-sync.pid"))"
+    return 0
+  fi
+  ensure_root_venv_extras
+  mkdir -p "$LOG_DIR" "$PID_DIR"
+  (
+    cd "$HERE"
+    SMARTMIRROR_MIRROR_ID="$CONTENT_SYNC_MIRROR_ID" \
+      nohup "$HERE/.venv/bin/python" "$CONTENT_SYNC_SCRIPT" \
+      >>"$LOG_DIR/content-sync.log" 2>&1 &
+    echo $! >"$PID_DIR/content-sync.pid"
+  )
+  log "content-sync: waiting for the first Mongo -> Qdrant reconcile..."
+  wait_for_mongo_truthy "db.mirror_status.findOne({mirror_id:\"$CONTENT_SYNC_MIRROR_ID\"}) !== null" 60 \
+    || die "content-sync daemon did not report in -- see $LOG_DIR/content-sync.log"
+  log "content-sync: up (pid $(cat "$PID_DIR/content-sync.pid")) -- dashboard edits now reach the RAG + widget cache live"
+}
+
 bootstrap_admin_user() {
   local sync_flag="${1:-}"
   ensure_backend_venv
@@ -214,6 +255,7 @@ cmd_up() {
   "$MONGO_SH" init
   "$MONGO_SH" seed-if-empty
   bootstrap_admin_user "$sync_password_flag"
+  start_content_sync
   start_backend
   start_frontend
   print_summary
@@ -227,6 +269,9 @@ print_summary() {
   echo " Mongo:     $MONGO_URI"
   echo " Backend:   http://localhost:$BACKEND_PORT  (docs: http://localhost:$BACKEND_PORT/docs)"
   echo " Frontend:  http://localhost:$FRONTEND_PORT"
+  echo " Content sync: running -- dashboard edits reach the assistant's RAG"
+  echo "                and the mirror's cached widget data live (no need to"
+  echo "                run the full mirror app for that)."
   echo " Admin:     $DASHBOARD_ADMIN_USER"
   if [ "$ADMIN_PASSWORD_JUST_GENERATED" = "true" ]; then
     echo " Password:  $DASHBOARD_ADMIN_PASSWORD   (generated just now -- shown once; also saved in .env)"
@@ -235,7 +280,7 @@ print_summary() {
   fi
   echo " Stop:      ./dev.sh down"
   echo " Status:    ./dev.sh status"
-  echo " Logs:      ./dev.sh logs {mongo|backend|frontend}"
+  echo " Logs:      ./dev.sh logs {mongo|backend|frontend|content-sync}"
   echo "================================================================"
 }
 
@@ -243,6 +288,7 @@ cmd_down() {
   load_env
   stop_proc "$PID_DIR/frontend.pid" "$(frontend_pattern)" "frontend"
   stop_proc "$PID_DIR/backend.pid" "$(backend_pattern)" "backend"
+  stop_proc "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" "content-sync"
   "$MONGO_SH" stop
 }
 
@@ -256,6 +302,19 @@ cmd_status() {
   echo
   echo "Frontend (:$FRONTEND_PORT):"
   if curl -fsS "http://localhost:$FRONTEND_PORT/" >/dev/null 2>&1; then echo "  up"; else echo "  down"; fi
+  echo
+  echo "Content sync (Mongo -> RAG + widget cache):"
+  if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
+    echo "  up (pid $(cat "$PID_DIR/content-sync.pid"))"
+    if mongo_is_primary; then
+      dev_mongosh --quiet --eval "
+        const m = db.mirror_status.findOne({mirror_id:\"$CONTENT_SYNC_MIRROR_ID\"});
+        print('  last synced: ' + (m ? m.last_sync_at : 'never yet'));
+      "
+    fi
+  else
+    echo "  down"
+  fi
   echo
   if mongo_is_primary; then
     echo "Content doc counts:"
@@ -277,7 +336,8 @@ cmd_logs() {
     mongo) tail -f "$MONGO_DIR/.data/mongod.log" ;;
     backend) tail -f "$LOG_DIR/backend.log" ;;
     frontend) tail -f "$LOG_DIR/frontend.log" ;;
-    *) die "usage: $0 logs {mongo|backend|frontend}" ;;
+    content-sync) tail -f "$LOG_DIR/content-sync.log" ;;
+    *) die "usage: $0 logs {mongo|backend|frontend|content-sync}" ;;
   esac
 }
 
@@ -322,6 +382,13 @@ cmd_reseed() {
 
 cmd_mirror() {
   load_env
+  # examples/mvp.py does its own full Mongo<->Qdrant sync; it can't share
+  # Qdrant's embedded storage lock with the standalone content-sync daemon
+  # at the same time, so stop that first (./dev.sh up brings it back later).
+  if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
+    log "stopping the content-sync daemon first (the mirror app does its own syncing; they can't both hold Qdrant's storage lock)"
+    stop_proc "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" "content-sync"
+  fi
   cd "$HERE"
   exec uv run python examples/mvp.py
 }
@@ -365,26 +432,39 @@ cmd_help() {
   cat <<'EOF'
 Usage: ./dev.sh <command> [args]
 
-  up [--sync-admin-password]   Start Mongo + dashboard backend + frontend.
-                                Idempotent: reuses whatever's already running.
-                                First run creates .env with generated secrets.
-                                --sync-admin-password resets the configured
-                                admin's password to match .env even if the
-                                user already existed.
-  down                          Stop frontend, backend, and Mongo.
-  status                        Up/down + PRIMARY? + doc counts + user list.
-  logs {mongo|backend|frontend} Tail that component's log.
+  up [--sync-admin-password]   Start Mongo + content-sync daemon + dashboard
+                                backend + frontend. Idempotent: reuses
+                                whatever's already running. First run
+                                creates .env with generated secrets, and
+                                installs the data/assistant extras (torch
+                                etc. -- can take a few minutes) for the
+                                content-sync daemon. --sync-admin-password
+                                resets the configured admin's password to
+                                match .env even if the user already existed.
+  down                          Stop frontend, backend, content-sync, Mongo.
+  status                        Up/down + PRIMARY? + last sync + doc counts
+                                 + user list.
+  logs {mongo|backend|frontend|content-sync}  Tail that component's log.
   mongosh [args]                Run the bundled mongosh against MONGO_URI.
   reset-password <user> [pw]    Set/overwrite a password (creates as admin
                                  if the user doesn't exist). Omit the
                                  password to get one generated and printed.
   reseed [--yes]                DESTRUCTIVE: wipe + reseed dev content.
                                  Asks for confirmation unless --yes.
-  mirror                        Run examples/mvp.py with MONGO_URI from .env.
+  mirror                        Run examples/mvp.py (full camera-driven
+                                 mirror) with MONGO_URI from .env. Stops the
+                                 content-sync daemon first (see note below).
   install-autostart              Install (but do not enable) a systemd
                                  --user unit that runs Mongo at login.
   uninstall-autostart             Remove it.
   help                           This.
+
+Note: the dashboard writes content straight to Mongo. For that content to
+reach the assistant's RAG and the mirror's cached widget data, something
+has to run the Mongo->Qdrant sync -- either the content-sync daemon
+(started by `up`, stopped by `down`) or the full mirror app (`mirror`).
+They can't both run at once (Qdrant's embedded storage takes an exclusive
+lock); `mirror` stops the daemon for you, `up` brings it back.
 EOF
 }
 
