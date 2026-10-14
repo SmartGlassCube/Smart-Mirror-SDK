@@ -14,3 +14,5 @@ smartmirror/content/.cache/
 dashboard/backend/.venv
 dashboard/frontend/node_modules
 dashboard/frontend/dist
+
+.dev/

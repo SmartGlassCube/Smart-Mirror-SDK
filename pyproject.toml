@@ -43,6 +43,22 @@ assistant = [
   "piper-tts>=1.2.0"
 ]
 
+# uv-native equivalent of the `dev` extra above -- `[dependency-groups]`
+# (unlike `[project.optional-dependencies]`) is synced by `uv run`/`uv sync`
+# by default, with no --extra flag needed. This is what makes plain
+# `uv run pytest` reliably use .venv's pytest instead of silently falling
+# back to whatever `pytest` happens to be on $PATH. Keep both tables in
+# sync: `[project.optional-dependencies].dev` still exists for plain
+# `pip install -e ".[dev]"` users.
+[dependency-groups]
+dev = [
+  "pytest",
+  "black",
+  "mypy",
+  "ruff",
+  "pytest-asyncio>=1.2.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["smartmirror*"]

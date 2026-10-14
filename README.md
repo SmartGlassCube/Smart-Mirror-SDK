@@ -2,7 +2,36 @@
 
 A local-first Python SDK for gesture-controlled smart mirrors: webcam → hand gestures → pages and widgets → React UI over WebSocket.
 
-## How to start developing
+## Dev quickstart (Mongo + dashboard)
+
+```bash
+git clone <this repo> && cd Smart-Mirror-SDK
+./dev.sh up                  # first run: creates .env, downloads Mongo, seeds dev data
+# open http://localhost:5174, log in with the admin user/password printed above
+#   (after the first run: the password lives in .env -- DASHBOARD_ADMIN_PASSWORD)
+./dev.sh down                # when you're done
+```
+
+No sudo, no manual Mongo/mongosh/user setup, ever -- `./dev.sh up` is idempotent,
+safe to re-run from any state (fresh clone, already running, after a reboot
+or a crash).
+
+| Command | What it does |
+|---|---|
+| `./dev.sh up [--sync-admin-password]` | Start Mongo + dashboard backend (`:8000`) + frontend (`:5174`). Reuses whatever's already running. |
+| `./dev.sh down` | Stop all three. |
+| `./dev.sh status` | Up/down, PRIMARY?, content doc counts, dashboard user list. |
+| `./dev.sh logs {mongo\|backend\|frontend}` | Tail that component's log. |
+| `./dev.sh mongosh [args]` | Run the bundled mongosh against `MONGO_URI`. |
+| `./dev.sh reset-password <user> [pw]` | Set/create a password; omit it to get one generated. |
+| `./dev.sh reseed [--yes]` | **Destructive**: wipe + reseed dev content. |
+| `./dev.sh mirror` | Run `examples/mvp.py` with `MONGO_URI` from `.env`. |
+| `./dev.sh install-autostart` / `uninstall-autostart` | A systemd `--user` unit to run Mongo at login (not enabled automatically). |
+
+See [OVERNIGHT_REPORT.md](OVERNIGHT_REPORT.md) and [WORK_REPORT.md](WORK_REPORT.md)
+for how this was built and verified.
+
+## How to start developing (mirror only, no Mongo/dashboard)
 
 From the repo root:
 
@@ -13,6 +42,12 @@ uv pip install -e ".[data,dev]"
 python examples/mvp.py             # needs a webcam and Node/npm for the UI
 python -m pytest                   # unit tests, no camera needed
 ```
+
+`uv run pytest` works out of the box (pytest is a default `uv sync` dependency
+group, not an opt-in extra) but the assistant/content test suites need the
+heavier `data`/`assistant` extras installed once: `uv sync --extra data --extra assistant`.
+After that, plain `uv run pytest ...` keeps using them (`uv sync` on its own
+re-trims back to just the defaults -- that's the one command to avoid).
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): architecture and module tour
 - [docs/extending.md](docs/extending.md): add your own gestures, widgets and pages
