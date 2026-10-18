@@ -326,3 +326,339 @@ dba4db1 dev.sh up: start a standalone content-sync daemon too
 
 On top of the overnight session's 5 commits (`68c48a1`..`f821aa8`, see
 `OVERNIGHT_REPORT.md`). Nothing pushed, nothing merged.
+
+---
+
+# Repo split: dashboard/ + infra/mongo/ -> the Dashboard repo
+
+Ran on 2026-10-18, unattended. Two repos now: **Smart-Mirror-SDK** (branch
+`amin/content-sync`, 1 new commit) and **Dashboard**
+(https://github.com/SmartGlassCube/Dashboard, branch `amin/fastapi-dashboard`,
+2 new commits). Nothing pushed, nothing merged into either `main`.
+
+## STEP 0 -- the existing Dashboard repo
+
+Cloned `git@github.com:SmartGlassCube/Dashboard.git` into `../Dashboard`.
+It's a **placeholder, not an implementation**: one commit ("Initial commit",
+Moetez Fradi, 2025-12-18), containing only `LICENSE` (MIT, Smart Glass Cube)
+and a 2-line `README.md` ("The dashboard that will be used by IEEE INSAT
+bureau to add new data and events."). No stack chosen, no code, one branch
+(`main`). Nothing to compare side-by-side against, nothing to overwrite, no
+conflicting approach to reconcile -- all our work landed on a fresh branch
+(`amin/fastapi-dashboard`) off `main`, with `main` itself untouched.
+
+## STEP 1 -- building the Dashboard repo (branch `amin/fastapi-dashboard`)
+
+**History preserved, as asked**: `git subtree split --prefix=dashboard -b dashboard-export`
+in Smart-Mirror-SDK produced a 3-commit branch (`backend/`+`frontend/` at
+its root, prefix stripped). Pulled into `../Dashboard` via a temporary local
+remote and `git merge --allow-unrelated-histories` on top of `main` --
+`git log --oneline --graph` on that branch shows the 3 original commits
+(`e8de798`, `c9739b8`, `e39a9fc`) as real ancestors, not squashed:
+
+```
+*   43ea886 Merge dashboard-export from Smart-Mirror-SDK (backend/, frontend/, full history)
+|\
+| * e39a9fc Add ./dev.sh: one idempotent command for the whole dev stack
+| * c9739b8 Phase C (frontend): dashboard/frontend -- React + TypeScript + Vite exec-board UI
+| * e8de798 Phase C (backend): dashboard/backend -- FastAPI CRUD + auth + mirror monitoring
+* 06b27ae Initial commit
+```
+
+**Layout: `backend/`, `frontend/` at the repo root** (not kept under a
+`dashboard/` wrapper) -- the existing repo had no layout to defer to (see
+STEP 0), and a dedicated repo whose whole purpose is the dashboard doesn't
+need the extra nesting.
+
+**`infra/mongo/` moved here, this repo now owns the database and the
+contract.** Copied `CONTRACT.md`, `init_db.js`, `seed.js`,
+`docker-compose.yml`, `dev_mongod.sh`, `verify_phase_a.py` as new files
+(not subtree-split -- wasn't asked to preserve their history, and they're
+small/mostly-static). Also physically copied the gitignored `.bin/`
+(589M, the mongod/mongosh binaries) and `.data/` (411M, the live dev
+dataset) on disk, so the running Mongo's actual data carried over instead
+of starting from an empty seed -- confirmed by starting mongod from the new
+location and getting the same doc counts as before the copy.
+
+**Contract bumped to v0.4**: added a `_meta` collection (one doc,
+`_id: "contract"`, written by `init_db.js`) that Smart-Mirror-SDK's content
+sync reads to check compatibility. Hit a real gotcha here: `ieee._meta`
+doesn't work via dot-access in **either** mongosh or pymongo -- both
+special-case a leading underscore as colliding with their own internal
+attributes (pymongo even raises a named error about it: `Database has no
+attribute '_meta'. ... use database['_meta']`). Verified this directly
+before working around it, rather than guessing. Fixed with
+`getCollection("_meta")` in `init_db.js` and `db["_meta"]` in Python, kept
+the literal `_meta` name as asked rather than renaming around the problem.
+
+**`backend/app/config.py` path bug caught before it mattered**: the root-
+`.env` loader was computed as `_BACKEND_DIR.parent.parent`, correct for the
+*old* nested `dashboard/backend/app/config.py` (two levels up to repo
+root) but one level too many for the new flat `backend/app/config.py` --
+would have silently loaded nothing and fallen back to a random JWT secret
+every restart. Fixed to `_BACKEND_DIR.parent`.
+
+**`dev.sh`** (adapted from Smart-Mirror-SDK's, same robustness
+guarantees): `up`/`down`/`status`/`logs`/`mongosh`/`reset-password`/
+`reseed`/`install-autostart`/`uninstall-autostart` for Mongo + backend +
+frontend + admin bootstrap. Own `.env`/`.env.example`.
+
+**README**: dev quickstart, stack overview, and the relationship to
+Smart-Mirror-SDK (Mongo-only, no shared code).
+
+Committed as `8ea5114`.
+
+### STEP 1 verification (exact output)
+
+Cold `down` then `up`, from `../Dashboard`:
+```
+$ ./dev.sh down
+dev.sh: frontend: stopped
+dev.sh: backend: stopped
+mongo: stopped
+$ ./dev.sh up
+mongo: content collections already have 11 doc(s) total, not reseeding
+user 'admin' already exists, left untouched (pass --sync-password to overwrite)
+dev.sh: backend: up (pid ...) -- http://localhost:8000
+dev.sh: frontend: up (pid ...) -- http://localhost:5174
+================================================================
+ Dashboard dev stack is up
+================================================================
+ ...
+================================================================
+```
+
+Login with the `.env` credentials:
+```
+$ source .env
+$ curl -s -i -X POST http://localhost:8000/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d "{\"username\":\"$DASHBOARD_ADMIN_USER\",\"password\":\"$DASHBOARD_ADMIN_PASSWORD\"}"
+HTTP/1.1 200 OK
+set-cookie: smartmirror_dashboard_session=...; HttpOnly; Max-Age=28800; Path=/; SameSite=lax
+{"username":"admin","role":"admin"}
+```
+(One real gotcha here too: the *migrated* `admin` user already existed with
+its old password from the overnight session, so the newly-generated `.env`
+password didn't actually work until I ran `./dev.sh up --sync-admin-password`
+once -- expected behavior given the "don't overwrite an existing password"
+rule, just a one-time migration step worth calling out.)
+
+Backend tests and frontend build, from `../Dashboard` only:
+```
+$ cd backend && uv run pytest tests -q
+18 passed, 1 warning in 10.08s
+$ cd frontend && npm run build
+✓ built in 801ms   (0 TypeScript errors)
+```
+
+## STEP 2 -- shrinking Smart-Mirror-SDK (branch `amin/content-sync`)
+
+Removed `dashboard/` and `infra/mongo/` (`git rm -r --cached` + `rm -rf` --
+confirmed gone from disk, not just untracked). Kept `smartmirror/content/`
+and `scripts/content_sync_daemon.py`.
+
+**Contract-version compatibility check**, as asked:
+- `CONTRACT_VERSION = "0.4"` in `smartmirror/content/config.py`, matching
+  the Dashboard repo's `init_db.js`.
+- `ContentSync.check_contract_version()` reads the `_meta` doc on every
+  `reconcile()` call and at `run_forever()` startup. A **major** version
+  difference (the part before the first `.`) refuses to sync -- logs at
+  `ERROR`, sets `last_error`, leaves the cache/Qdrant untouched, and (at
+  the `run_forever` level) skips `watch()` entirely for that run, not just
+  one `reconcile()` call. A **minor** difference is treated as compatible.
+  Mongo being simply *unreachable* during the check is explicitly **not**
+  treated as a mismatch -- it falls through to `reconcile()`/`watch()`'s
+  own existing retry/backoff logic, so a Mongo that's briefly down at boot
+  still recovers once it comes back (no regression from before this
+  change). 3 new tests in `smartmirror/content/tests/test_sync.py`.
+
+**`dev.sh` shrunk** to what's actually left here: `up`/`down` for the
+content-sync daemon, `status` (Mongo reachable? + daemon + mirror app),
+`logs`, `mirror`. Every command that needs Mongo and can't reach it now
+fails with "start it from the Dashboard repo: ../Dashboard/dev.sh up"
+instead of a raw connection error.
+
+**Tests**: `smartmirror/content/tests/conftest.py`'s `MONGO_URI` is now
+read from the environment (was hardcoded to `localhost`) with a skip
+message pointing at `../Dashboard/dev.sh up` when unreachable.
+
+**README + code comments**: updated to point at the Dashboard repo
+wherever `infra/mongo/CONTRACT.md` or `dashboard/` used to be referenced
+locally (`examples/mvp.py`, `smartmirror/content/routing.py`, `config.py`,
+`sync.py`, `README.md`).
+
+Committed as `8f3b159`.
+
+## VERIFY (exact output)
+
+**SDK content-sync daemon connects; all SDK tests pass** (against the
+Dashboard repo's Mongo):
+```
+$ ./dev.sh up
+dev.sh: content-sync: waiting for the first Mongo -> Qdrant reconcile...
+dev.sh: content-sync: up (pid ...) -- dashboard edits now reach the RAG + widget cache live
+
+$ CUDA_VISIBLE_DEVICES="" uv run pytest tests/ smartmirror/assistant/tests/ smartmirror/content/tests -q
+159 passed in 95.51s
+```
+(One flaky run along the way: `test_assistant_answers_next_event_question`
+failed once on the tiny `qwen2.5:0.5b` model giving a self-contradictory
+answer -- "No, there are no upcoming events... the context provides
+information about the Quantum Computing Crash Course event" in an earlier,
+similar incident. Re-ran it alone immediately after and it passed; this is
+pre-existing LLM-quality flakiness unrelated to the repo split, not a
+regression -- the retrieval+prompt-block half of that same test, which
+doesn't depend on the LLM's phrasing, passed every time.)
+
+**Live loop across the repo boundary** -- created via the Dashboard repo's
+API, read by the SDK's content sync, with no manual reconcile step:
+```
+$ curl -s -b cookies.txt -X POST http://localhost:8000/api/events -d '{...
+    "title": "Cross-Repo Split Test Event", "status": "published", ...}'
+{"id": "6ad4f809af7dd3831e1c6661", ...}
+```
+Within ~2s, the SDK's on-disk cache (read by a process in a *different*
+repo on a *different* path) contained it:
+```
+found in live cache: True
+Cross-Repo Split Test Event
+```
+Paused the daemon to safely query its Qdrant store directly, confirmed the
+RAG side too:
+```
+- Event: Cross-Repo Split Test Event. Date: Tuesday, December 1, 2026 at
+  11:00. Location: INSAT. Verifying the Dashboard repo and Smart-Mirror-SDK
+  repo talk only through Mongo.
+found: True
+```
+Deleted it via the Dashboard's API; gone from the cache within a few
+seconds (first check raced the daemon's restart and showed a false
+"still there" -- waited 5s, confirmed "still in cache after delete: False").
+
+**Contract mismatch -- refuses, with a clear log line; recovers after
+restoring it** (against the real, shared, non-test Mongo):
+```
+$ mongosh ... --eval 'db.getCollection("_meta").updateOne({_id:"contract"}, {$set:{version:"9.0"}})'
+{ _id: 'contract', version: '9.0' }
+
+$ ./dev.sh down && ./dev.sh up   # (Smart-Mirror-SDK)
+...
+$ tail .dev/logs/content-sync.log
+2026-10-18 17:48:48,510 smartmirror.content.sync ERROR contract version mismatch: Mongo reports v9.0, this code expects v0.4 (major version differs) -- refusing to sync until this is fixed.
+
+$ ./dev.sh status
+Content sync:
+  up (pid ...)
+  last synced: None
+  last error:  contract version mismatch: Mongo v9.0 vs code v0.4
+
+$ mongosh ... --eval 'db.getCollection("_meta").updateOne({_id:"contract"}, {$set:{version:"0.4"}})'
+$ ./dev.sh down && ./dev.sh up
+$ ./dev.sh status
+Content sync:
+  up (pid ...)
+  last synced: 2026-10-18 16:49:25.576000
+  last error:  None
+```
+
+**`git status` clean in both repos** (confirmed just now, after all of the
+above):
+```
+$ cd Smart-Mirror-SDK && git status --short
+?? ui/      # pre-existing, unrelated -- see "Untouched, found as-is" above
+
+$ cd Dashboard && git status --short
+(nothing)
+```
+
+### Commits per repo
+
+**Smart-Mirror-SDK** (`amin/content-sync`, new this session):
+```
+8f3b159 Split the dashboard out to the Dashboard repo; shrink this repo to the SDK side
+```
+
+**Dashboard** (`amin/fastapi-dashboard`, new this session):
+```
+8ea5114 Add dev.sh, infra/mongo (now owned here), and fix root-.env path depth
+43ea886 Merge dashboard-export from Smart-Mirror-SDK (backend/, frontend/, full history)
+e39a9fc Add ./dev.sh: one idempotent command for the whole dev stack          <- preserved history
+c9739b8 Phase C (frontend): dashboard/frontend -- ...                         <- (subtree split,
+e8de798 Phase C (backend): dashboard/backend -- ...                          <-  not new work)
+06b27ae Initial commit                                                        <- pre-existing
+```
+
+## NEEDS YOU
+
+**Push commands, in order** (I did not run these -- no git push without
+being told to):
+
+```bash
+# 1. Dashboard repo first (SDK's tests/README now point at it, but nothing
+#    there depends on SDK being pushed first -- order doesn't strictly
+#    matter between the two, this is just a reasonable sequence)
+cd ../Dashboard
+git push -u origin amin/fastapi-dashboard
+
+# 2. Smart-Mirror-SDK
+cd ../Smart-Mirror-SDK
+git push -u origin amin/content-sync   # if not already pushed from earlier sessions -- check first:
+git log --oneline origin/amin/content-sync..HEAD   # anything listed hasn't been pushed yet
+```
+
+**Talk to the Dashboard repo's people before merging `amin/fastapi-dashboard` into its `main`.**
+It currently has exactly one commit, by Moetez Fradi (also the
+Smart-Mirror-SDK author) -- there's no competing implementation to
+reconcile, but it's still *their* repo's `main` and first real code landing
+in it; worth a heads-up/review before merging rather than just opening a
+PR unannounced. There's no stack conflict to resolve (STEP 0 found nothing
+to compare against), just the normal courtesy of a first PR into a
+teammate's repo.
+
+**Before anyone else runs either repo's `./dev.sh up` for the first time**,
+note that `infra/mongo/.bin` (589M of mongod/mongosh binaries) and
+`infra/mongo/.data` (411M, the live dev dataset) are gitignored -- they
+exist only on this machine, copied from the original SDK location rather
+than pushed. A fresh clone elsewhere re-downloads the binaries
+automatically (`dev_mongod.sh`'s `ensure_binaries`) but starts with an
+**empty** database until `seed-if-empty` runs its dev seed -- the actual
+club content currently in the dataset on this machine does not travel with
+the repos. If that content matters, it needs an explicit export/import
+(e.g. `mongodump`/`mongorestore`) as a separate, deliberate step -- didn't
+do this since nothing asked for it and it's a judgment call on your data,
+not mine to make silently.
+
+**Both repos' `.env` files hold live secrets** (admin passwords, JWT
+secrets) -- confirmed gitignored in both, not committed, but flagging
+since they now physically exist in two separate repo directories instead
+of one.
+
+## Decisions worth a second look (this session)
+
+- **Subtree-split history vs. a fresh start**: chose to preserve the 3
+  commits' authorship/messages via `git subtree split` + merge, per the
+  explicit instruction. An alternative (copy the files, one fresh commit,
+  reference the old history via a comment) would have been simpler but
+  loses `git blame`/`git log` fidelity for that code going forward.
+- **`backend/`/`frontend/` at the Dashboard repo's root, not under
+  `dashboard/`**: there was no existing layout to defer to (STEP 0), and
+  a repo whose entire purpose is the dashboard doesn't need the extra
+  nesting. If the team already has a convention for this (e.g. matching
+  some other repo's shape), this is the one thing from STEP 1 worth a
+  quick sanity check before merging.
+- **`infra/mongo/`'s small files (not `dashboard/`) were moved as new
+  files, not subtree-split** -- wasn't asked to preserve their history
+  specifically, and they're a handful of mostly-static config files where
+  that would have added subtree-split complexity for little benefit.
+- **The physical Mongo dataset was copied, not left to reseed from
+  scratch** -- judgment call to avoid losing whatever had accumulated in
+  it across sessions; see the NEEDS YOU note above about this not being a
+  substitute for a real backup/migration of actual club content.
+- **Contract-mismatch handling refuses the whole sync (reconcile *and*
+  watch), not just one reconcile call** -- a version mismatch caught only
+  at one `reconcile()` call but not gating `watch()` would have left the
+  change-stream watcher running and silently applying a possibly-
+  incompatible schema's writes to the cache/Qdrant every time something
+  changed in Mongo, which seemed worse than just refusing outright until
+  someone fixes the mismatch and restarts the daemon.
