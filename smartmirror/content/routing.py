@@ -1,4 +1,4 @@
-"""The routing table from infra/mongo/CONTRACT.md, in code.
+"""The routing table from infra/mongo/CONTRACT.md (Dashboard repo), in code.
 
 Only `status == "published"` documents ever reach the mirror -- not just in
 the widgets below, but in `sync.py` (nothing non-published is ever written

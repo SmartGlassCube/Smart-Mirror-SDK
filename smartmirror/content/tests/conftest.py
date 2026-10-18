@@ -1,3 +1,4 @@
+import os
 import shutil
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -13,8 +14,15 @@ from smartmirror.content.config import COLLECTIONS, ContentSyncConfig
 from smartmirror.content.indexer import ContentIndexer
 from smartmirror.content.sync import ContentSync
 
-MONGO_URI = "mongodb://localhost:27017/?directConnection=true"
+# Mongo is owned by the Dashboard repo (../Dashboard) -- these tests just
+# need MONGO_URI (same var the content sync itself reads) to point at it.
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/ieee?directConnection=true")
 TEST_DB = "ieee_content_sync_test"
+
+NOT_REACHABLE_MESSAGE = (
+    f"Mongo not reachable at {MONGO_URI} -- it's owned by the Dashboard repo now, "
+    "start it with ../Dashboard/dev.sh up (or set MONGO_URI to point at it)"
+)
 
 
 def _mongo_reachable() -> bool:
@@ -25,10 +33,7 @@ def _mongo_reachable() -> bool:
         return False
 
 
-requires_mongo = pytest.mark.skipif(
-    not _mongo_reachable(),
-    reason="local Mongo not reachable at mongodb://localhost:27017 -- start it with infra/mongo/dev_mongod.sh start",
-)
+requires_mongo = pytest.mark.skipif(not _mongo_reachable(), reason=NOT_REACHABLE_MESSAGE)
 
 
 @pytest.fixture

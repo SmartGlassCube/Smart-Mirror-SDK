@@ -87,7 +87,8 @@ if __name__ == "__main__":
 
     # Separate from the generic personal-calendar Mongo above: this is the IEEE
     # INSAT club content sync (events/announcements/about/achievements/board),
-    # opt-in via MONGO_URI. See smartmirror/content/ and infra/mongo/CONTRACT.md.
+    # opt-in via MONGO_URI. See smartmirror/content/ and the Dashboard repo's
+    # infra/mongo/CONTRACT.md (https://github.com/SmartGlassCube/Dashboard).
     content_sync = None
     if os.getenv("MONGO_URI"):
         from smartmirror.content import build_content_sync

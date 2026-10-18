@@ -8,11 +8,6 @@ __pycache__/
 .qdrant_data/
 mvp_supervisor.log
 
-infra/mongo/.bin/
-infra/mongo/.data/
 smartmirror/content/.cache/
-dashboard/backend/.venv
-dashboard/frontend/node_modules
-dashboard/frontend/dist
 
 .dev/

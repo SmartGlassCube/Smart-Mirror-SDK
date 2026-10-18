@@ -19,7 +19,7 @@ from pymongo import MongoClient
 from pymongo.errors import OperationFailure, PyMongoError
 
 from .cache import ContentCache
-from .config import COLLECTIONS, ContentSyncConfig
+from .config import COLLECTIONS, CONTRACT_VERSION, ContentSyncConfig
 from .indexer import ContentIndexer, source_id
 from . import routing
 
@@ -36,6 +36,10 @@ def _is_resume_token_invalid(error: OperationFailure) -> bool:
 
 def _updated_at(doc: dict):
     return doc.get("updated_at")
+
+
+def _major(version: str) -> str:
+    return version.split(".", 1)[0]
 
 
 class ContentSync:
@@ -70,9 +74,36 @@ class ContentSync:
             now,
         )
 
+    # -- contract version: refuse to sync against an incompatible Dashboard --
+
+    def check_contract_version(self) -> bool:
+        """False only if Mongo is reachable AND reports an incompatible major
+        contract version (infra/mongo/CONTRACT.md, owned by the Dashboard
+        repo) -- Mongo being unreachable is left for reconcile()/watch()'s
+        own retry logic to handle, not treated as incompatible here.
+        """
+        try:
+            doc = self.db["_meta"].find_one({"_id": "contract"})
+        except PyMongoError:
+            return True
+        if doc is None or "version" not in doc:
+            return True  # no _meta yet (older Dashboard, or a dev DB seeded by hand) -- assume compatible
+        mongo_version = doc["version"]
+        if _major(mongo_version) != _major(CONTRACT_VERSION):
+            logger.error(
+                "contract version mismatch: Mongo reports v%s, this code expects v%s "
+                "(major version differs) -- refusing to sync until this is fixed.",
+                mongo_version, CONTRACT_VERSION,
+            )
+            self.last_error = f"contract version mismatch: Mongo v{mongo_version} vs code v{CONTRACT_VERSION}"
+            return False
+        return True
+
     # -- reconcile: full diff, safe to call any time (boot, or resume-token loss) --
 
     def reconcile(self) -> None:
+        if not self.check_contract_version():
+            return
         try:
             force_reindex = self._check_embedding_model()
             for collection in COLLECTIONS:
@@ -217,6 +248,12 @@ class ContentSync:
         asyncio.gather, same pattern as Assistant.listen_loop.
         """
         stop_event = stop_event or threading.Event()
+        if not await asyncio.to_thread(self.check_contract_version):
+            # Logged already. Don't reconcile or watch -- just keep
+            # heartbeating so the dashboard can see this mirror is alive
+            # and why it isn't syncing (last_error).
+            await self._heartbeat_loop(current_page_getter, stop_event)
+            return
         await asyncio.to_thread(self.reconcile)
         await asyncio.gather(
             asyncio.to_thread(self.watch, stop_event),

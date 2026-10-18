@@ -1,6 +1,7 @@
 """Integration tests against a real local Mongo (see conftest.requires_mongo).
 
-Run: ./infra/mongo/dev_mongod.sh start && uv run pytest smartmirror/content/tests -q
+Run: ../Dashboard/dev.sh up && uv run pytest smartmirror/content/tests -q
+(Mongo is owned by the Dashboard repo now -- see MONGO_URI in this repo's .env)
 """
 import threading
 import time
@@ -231,3 +232,51 @@ def test_mongo_down_does_not_raise(cache_dir, qdrant_collection, shared_embedder
     sync.reconcile()  # must not raise
     assert sync.last_error is not None
     sync.client.close()
+
+
+def test_contract_version_match_or_missing_allows_sync(mongo_db, content_sync):
+    from smartmirror.content.config import CONTRACT_VERSION
+
+    # No _meta doc at all (the conftest's lightweight schema doesn't create one).
+    assert content_sync.check_contract_version() is True
+
+    mongo_db["_meta"].update_one({"_id": "contract"}, {"$set": {"version": CONTRACT_VERSION}}, upsert=True)
+    assert content_sync.check_contract_version() is True
+
+    make_event(mongo_db, title="Should Sync Fine")
+    content_sync.reconcile()
+    assert len(content_sync.cache.docs("events")) == 1
+    assert content_sync.last_error is None
+
+
+def test_contract_version_major_mismatch_refuses_to_sync(mongo_db, content_sync):
+    from smartmirror.content.config import CONTRACT_VERSION
+
+    fake_major = str(int(CONTRACT_VERSION.split(".", 1)[0]) + 1)
+    mongo_db["_meta"].update_one(
+        {"_id": "contract"}, {"$set": {"version": f"{fake_major}.0"}}, upsert=True
+    )
+
+    make_event(mongo_db, title="Should Not Sync")
+    assert content_sync.check_contract_version() is False
+    assert "contract version mismatch" in content_sync.last_error
+
+    content_sync.reconcile()
+    assert content_sync.cache.docs("events") == {}  # refused -- cache untouched
+    assert content_sync.last_sync_at is None
+
+    # Restore -- subsequent reconcile proceeds normally.
+    mongo_db["_meta"].update_one({"_id": "contract"}, {"$set": {"version": CONTRACT_VERSION}}, upsert=True)
+    content_sync.reconcile()
+    assert len(content_sync.cache.docs("events")) == 1
+    assert content_sync.last_error is None
+
+
+def test_contract_version_minor_difference_is_compatible(mongo_db, content_sync):
+    from smartmirror.content.config import CONTRACT_VERSION
+
+    major, minor = CONTRACT_VERSION.split(".", 1)
+    other_minor = f"{major}.{int(minor) + 1}"
+    mongo_db["_meta"].update_one({"_id": "contract"}, {"$set": {"version": other_minor}}, upsert=True)
+
+    assert content_sync.check_contract_version() is True
