@@ -3,8 +3,6 @@
 Must not import anything from `smartmirror.assistant.rag`.
 """
 
-from anthropic import Anthropic
-
 from ..base import LLMBackend
 
 DEFAULT_MAX_TOKENS = 1024
@@ -14,6 +12,8 @@ class AnthropicBackend(LLMBackend):
     """Chat-completions backend for Claude models via the Anthropic SDK."""
 
     def __init__(self, api_key, model="claude-sonnet-5", max_tokens=DEFAULT_MAX_TOKENS):
+        from anthropic import Anthropic
+
         self.model = model
         self.max_tokens = max_tokens
         self._client = Anthropic(api_key=api_key)
