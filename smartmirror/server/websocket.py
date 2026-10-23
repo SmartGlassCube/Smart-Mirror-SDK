@@ -12,8 +12,10 @@ class ClientHub:
         (small annotated webcam preview + latest gestures, see `CameraPreview`)
       - `{"type": "POINTER", "position": {"x", "y"} | None}`: index fingertip for the cursor
         (see `HandPointer`); `None` when the hand is lost
-      - `{"type": "ASSISTANT_WAKE"}`: someone talked to the chatbot; wakes the Abdo avatar
-        (`hub.broadcast({"type": "ASSISTANT_WAKE"})`). Page changes wake it on their own.
+      - `{"type": "ASSISTANT_HEARD", "text": "..."}`: transcript of what the chatbot just heard,
+        shown next to the camera preview; `""` when only the wake word was said.
+      - `{"type": "ASSISTANT_WAKE"}`: the chatbot heard a question (sent by the server's voice
+        loop before the LLM answers); wakes the Abdo avatar. Page changes wake it on their own.
       - `{"type": "ASSISTANT_SAY", "text": "..."}`: chatbot reply; wakes Abdo and types the text
         into his speech bubble, replacing whatever it showed.
     Client messages are only logged for now.

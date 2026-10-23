@@ -6,6 +6,7 @@ import type { BackendMessage, CameraFrame, MirrorState } from '../types/mirror'
 import CameraPreview from './CameraPreview'
 import HandCursor, { type HandCursorHandle } from './HandCursor'
 import PageView from './PageView'
+import VoiceTranscript from './VoiceTranscript'
 
 // On a page change Abdo says the page name, for this long after it has finished typing.
 const PAGE_NAME_HOLD_MS = 2000
@@ -19,12 +20,18 @@ function MirrorCanvas() {
   const abdoRef = useRef<AbdoHandle>(null)
   const nodeIdRef = useRef<string | null>(null)
   const cursorRef = useRef<HandCursorHandle>(null)
+  const [heard, setHeard] = useState<{ id: number; text: string } | null>(null)
+  const heardCount = useRef(0)
+  const clearHeard = useCallback(() => setHeard(null), [])
 
   const onMessage = useCallback((message: BackendMessage) => {
     if (message.type === 'CAMERA_FRAME') {
       setCameraFrame(message)
     } else if (message.type === 'POINTER') {
       cursorRef.current?.move(message.position)
+    } else if (message.type === 'ASSISTANT_HEARD') {
+      heardCount.current += 1
+      setHeard({ id: heardCount.current, text: message.text })
     } else if (message.type === 'ASSISTANT_WAKE') {
       abdoRef.current?.wake()
     } else if (message.type === 'ASSISTANT_SAY') {
@@ -51,7 +58,10 @@ function MirrorCanvas() {
         {state.nodeId ? ` | Page: ${state.nodeId}` : ''}
         {pageIndex >= 0 ? ` (${pageIndex + 1}/${state.nodeIds.length})` : ''}
       </div>
-      {isConnected && cameraFrame ? <CameraPreview frame={cameraFrame} /> : null}
+      <div className="mirror-corner">
+        {isConnected && heard ? <VoiceTranscript key={heard.id} text={heard.text} onExpire={clearHeard} /> : null}
+        {isConnected && cameraFrame ? <CameraPreview frame={cameraFrame} /> : null}
+      </div>
       <PageView key={state.nodeId ?? 'none'} widgets={state.widgets} />
       <Abdo ref={abdoRef} />
       {isConnected ? <HandCursor ref={cursorRef} /> : null}

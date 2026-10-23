@@ -23,6 +23,8 @@ class SmartMirrorServer:
 
     Pass either a `graph` (pages + edges) or a configured `state_manager`.
     Pass a `gesture_detector` to customise the gesture set.
+    Pass an `assistant` built with `stt=True` to run the voice chatbot alongside,
+    shown by the Abdo avatar in the frontend.
     """
 
     def __init__(
@@ -69,13 +71,14 @@ class SmartMirrorServer:
             if with_frontend
             else None
         )
-        # Reserved for upcoming hardware / voice-assistant integrations.
-        self.hardware = hardware or HAL()
+        # One HAL for the whole app; the assistant's own when it brings one.
+        self.hardware = hardware or getattr(assistant, "hal", None) or HAL()
         self.assistant = assistant
         # Opt-in Mongo content sync (smartmirror.content) -- None (default)
         # means the mirror behaves exactly as before. See examples/mvp.py.
         self.content_sync = content_sync
-        self._content_sync_stop = threading.Event()
+        # Stops the background loops (content sync, voice assistant).
+        self._stop_event = threading.Event()
 
         self.widget_update_tick = widget_update_tick
         self.hub = ClientHub(state_manager)
@@ -91,29 +94,59 @@ class SmartMirrorServer:
                 tasks = [self._main_loop()]
                 if self.content_sync is not None:
                     tasks.append(self._content_sync_loop())
+                if getattr(self.assistant, "stt", None) is not None:
+                    tasks.append(self._assistant_loop())
                 await asyncio.gather(*tasks, return_exceptions=True)
         finally:
+            self._stop_background_loops()
             if self.frontend is not None:
                 await self.frontend.stop()
-            self._content_sync_stop.set()
 
     async def _content_sync_loop(self):
         try:
             await self.content_sync.run_forever(
                 current_page_getter=lambda: self.state_manager.current_node_id,
-                stop_event=self._content_sync_stop,
+                stop_event=self._stop_event,
             )
         except Exception:
             logger.exception("Content sync loop failed")
 
+    async def _assistant_loop(self):
+        # As soon as a question is heard the frontend shows its transcript and Abdo wakes
+        # (he's "thinking" while the LLM answers), then he types the answer while TTS speaks it.
+        try:
+            await self.assistant.listen_loop(
+                hal=self.hardware,
+                on_question=self._on_assistant_question,
+                on_answer=self.assistant_say,
+                stop_event=self._stop_event,
+            )
+        except Exception:
+            logger.exception("Assistant loop failed")
+
+    def _on_assistant_question(self, question):
+        self.assistant_heard(question)
+        self.assistant_wake()
+
     def stop(self):
         self.running = False
-        self._content_sync_stop.set()
+        self._stop_background_loops()
+
+    def _stop_background_loops(self):
+        self._stop_event.set()
+        # Ends the mic stream, so a voice turn blocked waiting for speech returns.
+        close = getattr(self.hardware, "close", None)
+        if callable(close):
+            close()
 
     # Hooks for the voice chatbot (RAG), shown by the Abdo avatar in the frontend.
     def assistant_wake(self):
         """Someone started talking to the chatbot: wake Abdo."""
         self.hub.broadcast({"type": "ASSISTANT_WAKE"})
+
+    def assistant_heard(self, text):
+        """Show what the chatbot heard next to the camera preview ("" = only the wake word)."""
+        self.hub.broadcast({"type": "ASSISTANT_HEARD", "text": text})
 
     def assistant_say(self, text):
         """Show a chatbot reply, typed out in Abdo's speech bubble."""

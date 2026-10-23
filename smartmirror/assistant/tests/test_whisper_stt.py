@@ -93,6 +93,27 @@ def test_transcribe_always_logs_the_raw_transcript(caplog):
     assert any("turn on the lights" in message for message in caplog.messages)
 
 
+def test_transcribe_drops_whispers_non_speech_annotations():
+    fake_model = _fake_model("[INTERPOSING VOICES] what is (coughs) IEEE INSAT *laughs*")
+
+    with patch(MODEL_PATH, return_value=fake_model):
+        stt = WhisperSTT(model="base.en")
+        result = stt.transcribe(np.zeros(10, dtype=np.int16))
+
+    assert result == "what is IEEE INSAT"
+
+
+def test_transcribe_of_noise_alone_is_empty():
+    """So the wake window doesn't send "[ Background noise ]" to the LLM as a question."""
+    fake_model = _fake_model("[ Background noise ]")
+
+    with patch(MODEL_PATH, return_value=fake_model):
+        stt = WhisperSTT(model="base.en")
+        result = stt.transcribe(np.zeros(10, dtype=np.int16))
+
+    assert result == ""
+
+
 def test_n_threads_none_defers_to_pywhispercpps_own_default():
     fake_model = _fake_model("ok")
 

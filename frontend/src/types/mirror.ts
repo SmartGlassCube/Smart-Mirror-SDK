@@ -46,6 +46,8 @@ export type BackendMessage =
   | ({ type: 'CAMERA_FRAME' } & CameraFrame)
   // Index fingertip for the cursor (server/hand_pointer.py); null when the hand is lost.
   | { type: 'POINTER'; position: PointerPosition | null }
+  // Transcript of what the chatbot heard, shown next to the camera preview; '' = only the wake word.
+  | { type: 'ASSISTANT_HEARD'; text: string }
   // Someone talked to the chatbot: wakes Abdo (see assistant/Abdo.tsx).
   | { type: 'ASSISTANT_WAKE' }
   // Chatbot reply: wakes Abdo and types `text` into his speech bubble.

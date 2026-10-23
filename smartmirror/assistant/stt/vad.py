@@ -16,7 +16,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_THRESHOLD = 500.0
 DEFAULT_SILENCE_BLOCKS = 15
 DEFAULT_MIN_SPEECH_BLOCKS = 3
-DEFAULT_MAX_TOTAL_BLOCKS = 300
+# 12s at HAL's 100ms blocks: plenty for one question, and in a noisy room where
+# the "silence" that ends an utterance never comes, it bounds how much
+# audio Whisper has to chew through (it was 30s).
+DEFAULT_MAX_TOTAL_BLOCKS = 120
 
 
 def rms(block: np.ndarray) -> float:
