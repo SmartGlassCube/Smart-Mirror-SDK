@@ -61,6 +61,8 @@ def mongo_db():
             "properties": {**common, **props},
         }}, validationLevel="strict", validationAction="error")
 
+    ensure("chapters", {"key": str_schema, "name": str_schema, "description": str_schema},
+           ["key", "name", "description"])
     ensure("events", {
         "title": str_schema, "description": str_schema, "start": date_schema, "end": date_schema,
         "location": {"bsonType": "string"},
@@ -129,6 +131,16 @@ def make_event(db, **overrides):
     }
     doc.update(overrides)
     return db.events.insert_one(doc).inserted_id
+
+
+def make_chapter(db, **overrides):
+    now = utcnow()
+    doc = {
+        "status": "published", "created_at": now, "updated_at": now, "updated_by": "test",
+        "key": "cs", "name": "Computer Society", "description": "Software and AI workshops.",
+    }
+    doc.update(overrides)
+    return db.chapters.insert_one(doc).inserted_id
 
 
 def make_announcement(db, **overrides):

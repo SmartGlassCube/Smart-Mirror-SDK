@@ -19,7 +19,7 @@ from pymongo import MongoClient
 from pymongo.errors import OperationFailure, PyMongoError
 
 from .cache import ContentCache
-from .config import COLLECTIONS, CONTRACT_VERSION, ContentSyncConfig
+from .config import CHAPTERED_COLLECTIONS, COLLECTIONS, CONTRACT_VERSION, ContentSyncConfig
 from .indexer import ContentIndexer, source_id
 from . import routing, templates
 
@@ -49,6 +49,8 @@ class ContentSync:
         self.config = config
         self.cache = cache
         self.indexer = indexer
+        # Indexed text names a doc's chapter, from the cached chapters.
+        self.indexer.chapters = self.chapter_names
         self.client = MongoClient(config.mongo_uri, tz_aware=True, serverSelectionTimeoutMS=5000)
         self.db = self.client[config.mongo_db]
 
@@ -66,13 +68,56 @@ class ContentSync:
             return routing.active_announcements(docs, now)
         return [doc for doc in docs if routing.is_published(doc)]
 
+    def chapter_names(self) -> dict:
+        """{key: name} of the published chapters."""
+        return routing.chapter_names(list(self.cache.docs("chapters").values()))
+
+    def calendar_days(self) -> dict:
+        """Every event keyed by local day, for the calendar widget: {"2026-10-28": [event, ...]}."""
+        return routing.events_by_day(list(self.cache.docs("events").values()), self.chapter_names())
+
+    def news(self, now: datetime = None) -> list[dict]:
+        """Active announcements, then achievements, for the news widget."""
+        return routing.news_items(
+            list(self.cache.docs("announcements").values()),
+            list(self.cache.docs("achievements").values()),
+            self.chapter_names(),
+            now,
+        )
+
     def prompt_block(self, now: datetime = None) -> str:
         return routing.build_prompt_block(
             list(self.cache.docs("events").values()),
             list(self.cache.docs("announcements").values()),
             list(self.cache.docs("about").values()),
             now,
+            chapter_docs=list(self.cache.docs("chapters").values()),
         )
+
+    def log_content(self) -> None:
+        """Print everything the mirror got from the dashboard (published only), to debug the sync."""
+        lines = ["Content from the dashboard (published only):"]
+        chapters = self.chapter_names()
+        for collection in COLLECTIONS:
+            docs = sorted(self.cache.docs(collection).values(), key=lambda doc: _describe(collection, doc, chapters))
+            lines.append(f"  {collection} ({len(docs)}):")
+            lines += [f"    - {_describe(collection, doc, chapters)}" for doc in docs]
+        days = self.calendar_days()
+        lines.append(f"  calendar ({len(days)} days with events):")
+        lines += [f"    - {day}: {', '.join(event['title'] for event in events)}" for day, events in sorted(days.items())]
+        logger.info("\n".join(lines))
+
+    def _reindex_chapter_content(self, names_before: dict) -> None:
+        """Re-index the content of every chapter added, renamed, or removed since `names_before`."""
+        names_after = self.chapter_names()
+        changed = {key for key in names_before.keys() | names_after.keys() if names_before.get(key) != names_after.get(key)}
+        if not changed:
+            return
+        logger.info("chapters changed (%s): re-indexing their content", ", ".join(sorted(changed)))
+        for collection in CHAPTERED_COLLECTIONS:
+            for doc in self.cache.docs(collection).values():
+                if doc.get("chapter") in changed:
+                    self.indexer.upsert(collection, doc)
 
     # -- contract version: refuse to sync against an incompatible Dashboard --
 
@@ -106,11 +151,15 @@ class ContentSync:
             return
         try:
             force_reindex = self._check_embedding_model()
+            chapters_before = self.chapter_names()
             for collection in COLLECTIONS:
                 self._reconcile_collection(collection, force_reindex)
+            if not force_reindex:
+                self._reindex_chapter_content(chapters_before)
             self.last_sync_at = datetime.now(timezone.utc)
             self.last_error = None
             logger.info("reconcile complete")
+            self.log_content()
         except PyMongoError as error:
             logger.warning("reconcile failed (Mongo unreachable?): %s", error)
             self.last_error = str(error)
@@ -198,9 +247,16 @@ class ContentSync:
         collection = change["ns"]["coll"]
         if collection not in COLLECTIONS:
             return
+        chapters_before = self.chapter_names()
+        self._apply_change(collection, change)
+        if collection == "chapters":
+            self._reindex_chapter_content(chapters_before)
+
+    def _apply_change(self, collection: str, change: dict) -> None:
 
         if change["operationType"] == "delete":
             doc_id = str(change["documentKey"]["_id"])
+            logger.info("dashboard change: deleted %s %s", collection, doc_id)
             self.cache.remove(collection, doc_id)
             self.indexer.remove(source_id(collection, doc_id))
             return
@@ -213,12 +269,14 @@ class ContentSync:
         if not routing.is_published(doc):
             # published -> draft (or never published): must not be in the cache/index.
             if doc_id in self.cache.docs(collection):
+                logger.info("dashboard change: unpublished %s: %s", collection, _describe(collection, doc, self.chapter_names()))
                 self.cache.remove(collection, doc_id)
                 self.indexer.remove(source_id(collection, doc_id))
             return
 
         self.cache.upsert(collection, doc_id, doc)
         self.indexer.upsert(collection, doc)
+        logger.info("dashboard change: %s %s: %s", change["operationType"], collection, _describe(collection, doc, self.chapter_names()))
 
     # -- heartbeat --
 
@@ -279,6 +337,26 @@ class ContentSync:
             if remaining <= 0:
                 return
             await asyncio.sleep(min(0.5, remaining))
+
+
+def _describe(collection: str, doc: dict, chapters: dict) -> str:
+    """One line per doc for log_content: the date (if any), whose it is, and what it is."""
+    owner = f"[{templates.chapter_name(doc, chapters) or 'SB'}]"
+    if collection == "chapters":
+        return f"{doc['key']}: {doc['name']}"
+    if collection == "events":
+        where = f" @ {doc['location']}" if doc.get("location") else ""
+        return f"{templates.to_local(doc['start']):%Y-%m-%d %H:%M} {owner} {doc['title']}{where}"
+    if collection == "announcements":
+        until = f" -> {templates.to_local(doc['expires_at']):%Y-%m-%d}" if doc.get("expires_at") else ""
+        return f"{templates.to_local(doc['publish_at']):%Y-%m-%d}{until} {owner} ({doc.get('priority', 'normal')}) {doc['title']}"
+    if collection == "about":
+        return f"{doc['key']}: {doc['title']}"
+    if collection == "achievements":
+        return f"{templates.to_local(doc['date']):%Y-%m-%d} {owner} {doc['title']}"
+    if collection == "board":
+        return f"{owner} {doc['role']}: {doc['name']} ({doc['term']})"
+    return str(doc.get("_id"))
 
 
 def build_content_sync(config: ContentSyncConfig = None) -> ContentSync:

@@ -296,3 +296,42 @@ def test_contract_version_minor_difference_is_compatible(mongo_db, content_sync)
     mongo_db["_meta"].update_one({"_id": "contract"}, {"$set": {"version": other_minor}}, upsert=True)
 
     assert content_sync.check_contract_version() is True
+
+
+def test_renaming_a_chapter_reindexes_its_content(mongo_db, content_sync, monkeypatch):
+    from .conftest import make_chapter
+
+    chapter_id = make_chapter(mongo_db)
+    make_event(mongo_db, title="CS Workshop", chapter="cs")
+    make_event(mongo_db, title="SB Assembly")
+    content_sync.reconcile()
+    assert "Computer Society chapter event: CS Workshop" in str(content_sync.indexer.store.query(
+        content_sync.indexer.embedder.embed(["CS Workshop"])[0], top_k=5))
+
+    reindexed = []
+    real_upsert = content_sync.indexer.upsert
+    monkeypatch.setattr(content_sync.indexer, "upsert",
+                        lambda collection, doc: reindexed.append(doc.get("title") or doc.get("name")) or real_upsert(collection, doc))
+    mongo_db.chapters.update_one({"_id": chapter_id}, {"$set": {"name": "IEEE CS", "updated_at": utcnow()}})
+    content_sync.reconcile()
+
+    assert sorted(reindexed) == ["CS Workshop", "IEEE CS"]  # the SB's own event untouched
+    assert "IEEE CS chapter event: CS Workshop" in str(content_sync.indexer.store.query(
+        content_sync.indexer.embedder.embed(["CS Workshop"])[0], top_k=5))
+
+
+def test_reconcile_prints_the_content_that_came_from_the_dashboard(mongo_db, content_sync, caplog):
+    from .conftest import make_chapter
+
+    make_chapter(mongo_db)
+    make_event(mongo_db, title="CS Workshop", chapter="cs", location="Lab 3")
+    make_event(mongo_db, title="Draft Event", status="draft")
+
+    with caplog.at_level("INFO", logger="smartmirror.content.sync"):
+        content_sync.reconcile()
+
+    dump = next(m for m in caplog.messages if m.startswith("Content from the dashboard"))
+    assert "cs: Computer Society" in dump
+    assert "[Computer Society] CS Workshop @ Lab 3" in dump
+    assert "Draft Event" not in dump
+    assert "calendar (1 days with events)" in dump

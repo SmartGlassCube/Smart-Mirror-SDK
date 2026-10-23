@@ -79,3 +79,64 @@ def test_build_prompt_block_includes_next_five_events_only():
         assert f"e{i}" in block
     for i in range(6, 8):
         assert f"e{i}" not in block
+
+
+def test_events_by_day_keys_events_by_local_day():
+    late = datetime(2026, 3, 9, 23, 30, tzinfo=timezone.utc)  # already March 10 in Tunis (UTC+1)
+    days = routing.events_by_day([
+        _event(_id="a", title="Late talk", start=late, location="Amphi A", chapter="cs"),
+        _event(_id="b", title="Morning", start=datetime(2026, 3, 10, 8, 0, tzinfo=timezone.utc)),
+        _event(_id="c", title="Draft", status="draft", start=late),
+    ], {"cs": "Computer Society"})
+
+    assert list(days) == ["2026-03-10"]
+    assert [e["title"] for e in days["2026-03-10"]] == ["Late talk", "Morning"]
+    assert days["2026-03-10"][0] == {
+        "id": "events:a", "title": "Late talk", "start": "2026-03-10T00:30:00+01:00", "end": None,
+        "location": "Amphi A", "chapter": "cs", "chapter_name": "Computer Society",
+    }
+    assert days["2026-03-10"][1]["chapter_name"] is None  # whole SB
+
+
+def test_events_by_day_keeps_past_events_and_spreads_multi_day_ones():
+    days = routing.events_by_day([
+        _event(title="Old", start=NOW - timedelta(days=30)),
+        _event(title="Hackathon", start=datetime(2026, 3, 10, 8, 0, tzinfo=timezone.utc),
+               end=datetime(2026, 3, 12, 18, 0, tzinfo=timezone.utc)),
+    ])
+
+    assert "2025-12-02" in days
+    assert [day for day, events in days.items() if events[0]["title"] == "Hackathon"] == [
+        "2026-03-10", "2026-03-11", "2026-03-12",
+    ]
+
+
+def test_news_items_are_active_announcements_then_newest_achievements():
+    news = routing.news_items(
+        [_announcement(title="Normal"), _announcement(title="Urgent", priority="high"),
+         _announcement(title="Expired", expires_at=NOW - timedelta(hours=1))],
+        [{"status": "published", "title": "Older win", "description": "d", "date": NOW - timedelta(days=60)},
+         {"status": "published", "title": "Newer win", "description": "d", "date": NOW - timedelta(days=5), "chapter": "cs"},
+         {"status": "draft", "title": "Draft win", "description": "d", "date": NOW}],
+        {"cs": "Computer Society"},
+        NOW,
+    )
+
+    assert [(n["kind"], n["title"]) for n in news] == [
+        ("announcement", "Urgent"), ("announcement", "Normal"),
+        ("achievement", "Newer win"), ("achievement", "Older win"),
+    ]
+    assert news[2]["chapter_name"] == "Computer Society"
+
+
+def test_build_prompt_block_lists_the_chapters_and_labels_chapter_events():
+    chapters = [
+        {"status": "published", "key": "cs", "name": "Computer Society"},
+        {"status": "published", "key": "ras", "name": "Robotics and Automation Society"},
+        {"status": "draft", "key": "pes", "name": "Power and Energy Society"},
+    ]
+    block = routing.build_prompt_block([_event(title="Workshop", chapter="cs")], [], [], NOW, chapter_docs=chapters)
+
+    assert "Computer Society chapter event: Workshop." in block
+    assert "IEEE INSAT Student Branch chapters: Computer Society, Robotics and Automation Society." in block
+    assert "Power and Energy" not in block

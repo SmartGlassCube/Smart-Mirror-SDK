@@ -120,13 +120,25 @@ if __name__ == "__main__":
         data_provider=OpenMeteoWeatherProvider(city="Tunis", latitude=36.8065, longitude=10.1815),
         refresh_interval=600,
     )
+    if content_sync is not None:
+        # The club's events from the dashboard, keyed by day: {"2026-10-28": [event, ...]}.
+        calendar_content = "IEEE INSAT events"
+        calendar_provider = lambda _widget=None: {"days": content_sync.calendar_days()}  # noqa: E731
     calendar = CalendarWidget(
         position={"x": 0.5, "y": 0.2},
         content=calendar_content,
         data_provider=calendar_provider,
         refresh_interval=60,
     )
-    news = NewsWidget(position={"x": 0.1, "y": 0.5}, content="Static news placeholder")
+    if content_sync is not None:
+        # Active announcements, then achievements, of the SB and its chapters.
+        news = NewsWidget(
+            position={"x": 0.1, "y": 0.5},
+            data_provider=lambda _widget=None: {"items": content_sync.news()},
+            refresh_interval=30,
+        )
+    else:
+        news = NewsWidget(position={"x": 0.1, "y": 0.5}, content="Static news placeholder")
     text = TextWidget(
         position={"x": 0.5, "y": 0.5},
         content={

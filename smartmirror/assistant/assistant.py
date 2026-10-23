@@ -17,6 +17,7 @@ from smartmirror.hal import HAL
 from .llm import LLMBackend, LLMClient, OpenAICompatBackend
 from .rag import Chunker, Embedder, Retriever, VectorStore
 from .stt import WakeWordDetector, WhisperSTT
+from .stt.vad import DEFAULT_NOISE_RATIO, NoiseFloor
 from .tts import PiperTTS
 from .tools import ToolManager
 
@@ -82,6 +83,7 @@ class Assistant:
         store=None,
         extra_context=None,
         max_answer_words=DEFAULT_MAX_ANSWER_WORDS,
+        noise_ratio=DEFAULT_NOISE_RATIO,
     ):
         self.language = language
         self.max_answer_words = max_answer_words or None
@@ -104,8 +106,13 @@ class Assistant:
         self.retriever = Retriever(store=self.store, embedder=self.embedder)
 
         self.hal = hal or (HAL() if (stt or tts) else None)
-        self.stt = WhisperSTT(language=language) if stt else None
-        self.wake_word_detector = WakeWordDetector(stt=self.stt, wake_word=wake_word) if stt else None
+        # One background-noise estimate for every utterance, wake word or follow-up,
+        # so only someone clearly louder than the room -- at the mirror -- is heard.
+        vad_kwargs = {"noise_floor": NoiseFloor(ratio=noise_ratio)} if noise_ratio else {}
+        self.stt = WhisperSTT(language=language, vad_kwargs=vad_kwargs) if stt else None
+        self.wake_word_detector = (
+            WakeWordDetector(stt=self.stt, wake_word=wake_word, vad_kwargs=vad_kwargs) if stt else None
+        )
         self.tts = PiperTTS(enabled=tts, hal=self.hal)
         self.tool_manager = ToolManager(tools=tools)
 

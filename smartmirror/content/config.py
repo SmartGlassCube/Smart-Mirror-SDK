@@ -12,13 +12,16 @@ just that Mongo URI and the contract version below.
 import os
 from pathlib import Path
 
-COLLECTIONS = ("events", "announcements", "about", "achievements", "board")
+# chapters first: the other collections' docs name their chapter when indexed.
+COLLECTIONS = ("chapters", "events", "announcements", "about", "achievements", "board")
+# Collections whose docs may belong to a chapter (contract v0.5); no `chapter` = the whole SB.
+CHAPTERED_COLLECTIONS = ("events", "announcements", "achievements", "board")
 
 # The contract version (infra/mongo/CONTRACT.md in the Dashboard repo) this
 # code was built against. sync.py refuses to touch the cache/Qdrant if the
 # Mongo it's talking to reports a different *major* version (the part
 # before the first "."); a minor difference is treated as compatible.
-CONTRACT_VERSION = "0.4"
+CONTRACT_VERSION = "0.5"
 
 DEFAULT_MONGO_URI = "mongodb://localhost:27017/ieee?directConnection=true"
 DEFAULT_MONGO_DB = "ieee"

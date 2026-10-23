@@ -38,8 +38,10 @@ class WhisperSTT:
         language: str = "en",
         models_dir: str = None,
         n_threads: int = DEFAULT_N_THREADS,
+        vad_kwargs: dict = None,
     ):
         self.model_name = model
+        self.vad_kwargs = vad_kwargs or {}
         self.language = language
         self.models_dir = models_dir
         self.n_threads = n_threads
@@ -83,7 +85,7 @@ class WhisperSTT:
         """
         from .vad import capture_utterance
 
-        audio = capture_utterance(hal.read_audio(), deadline=deadline)
+        audio = capture_utterance(hal.read_audio(), deadline=deadline, **self.vad_kwargs)
         if audio is None:
             return ""
         return self.transcribe(audio)

@@ -75,3 +75,42 @@ def test_render_announcement_includes_priority_and_dates():
 def test_render_board_includes_email_when_given():
     doc = {"name": "Sara", "role": "Chair", "term": "2026-2027", "email": "chair@example.com"}
     assert templates.render("board", doc).endswith("Contact: chair@example.com.")
+
+
+CHAPTERS = {"cs": "Computer Society"}
+
+
+def test_chapter_content_names_its_chapter():
+    start = datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc)
+    event = {"chapter": "cs", "title": "Workshop", "description": "d", "start": start}
+    achievement = {"chapter": "cs", "title": "Award", "date": start, "description": "d"}
+    announcement = {"chapter": "cs", "title": "Call", "body": "b", "priority": "high"}
+
+    assert templates.render("events", event, CHAPTERS).startswith("Computer Society chapter event: Workshop.")
+    assert templates.render("achievements", achievement, CHAPTERS).startswith("Computer Society chapter achievement: Award")
+    assert templates.render("announcements", announcement, CHAPTERS).startswith(
+        "Computer Society chapter important announcement: Call."
+    )
+
+
+def test_general_content_has_no_chapter_label():
+    start = datetime(2026, 11, 1, 9, 0, tzinfo=timezone.utc)
+    assert templates.render("events", {"title": "AG", "description": "d", "start": start}, CHAPTERS).startswith("Event: AG.")
+
+
+def test_sb_board_and_chapter_board_are_told_apart():
+    sb = {"name": "Sara", "role": "Chair", "term": "2026-2027"}
+    cs = {**sb, "name": "Omar", "chapter": "cs"}
+
+    assert "Sara is the Chair of the IEEE INSAT Student Branch board" in templates.render("board", sb, CHAPTERS)
+    assert "Omar is the Chair of the IEEE INSAT Computer Society chapter board" in templates.render("board", cs, CHAPTERS)
+
+
+def test_unknown_chapter_key_is_shown_as_is():
+    doc = {"chapter": "ras", "name": "Ali", "role": "Chair", "term": "2026-2027"}
+    assert "IEEE INSAT ras chapter board" in templates.render("board", doc, CHAPTERS)
+
+
+def test_render_chapter():
+    doc = {"key": "cs", "name": "Computer Society", "description": "Software and AI workshops."}
+    assert templates.render("chapters", doc) == "Chapter: the IEEE INSAT Computer Society chapter. Software and AI workshops."

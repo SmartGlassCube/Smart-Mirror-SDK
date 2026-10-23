@@ -543,3 +543,18 @@ def test_backward_compat_api_key_kwarg_still_builds_an_openai_compat_backend(iso
 def test_requires_llm_or_api_key(isolated_vector_store):
     with pytest.raises(ValueError):
         Assistant()
+
+
+def test_voice_listeners_share_one_noise_floor(isolated_vector_store, fake_backend):
+    a = Assistant(llm=fake_backend(), stt=True)
+
+    noise_floor = a.stt.vad_kwargs["noise_floor"]
+    assert a.wake_word_detector.vad_kwargs["noise_floor"] is noise_floor
+    assert noise_floor.ratio == 2.0
+
+
+def test_noise_ratio_none_keeps_the_fixed_threshold(isolated_vector_store, fake_backend):
+    a = Assistant(llm=fake_backend(), stt=True, noise_ratio=None)
+
+    assert a.stt.vad_kwargs == {}
+    assert a.wake_word_detector.vad_kwargs == {}

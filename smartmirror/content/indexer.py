@@ -26,17 +26,19 @@ def point_id(source: str, chunk_index: int) -> str:
 class ContentIndexer:
     """upsert(collection, doc) / remove(source_id) against a VectorStore."""
 
-    def __init__(self, store: VectorStore, embedder: Embedder = None, chunker: Chunker = None):
+    def __init__(self, store: VectorStore, embedder: Embedder = None, chunker: Chunker = None, chapters=None):
         self.store = store
         self.embedder = embedder or Embedder()
         self.chunker = chunker or Chunker()
+        # Callable -> {chapter key: name}, so a chapter's content says which chapter it's from.
+        self.chapters = chapters or dict
 
     def upsert(self, collection: str, doc: dict) -> None:
         """Delete any existing points for this doc, then re-chunk, re-embed, and re-insert."""
         source = source_id(collection, doc["_id"])
         self.store.delete_by_source(source)
 
-        text = templates.render(collection, doc)
+        text = templates.render(collection, doc, self.chapters())
         if not text or not text.strip():
             return
 
