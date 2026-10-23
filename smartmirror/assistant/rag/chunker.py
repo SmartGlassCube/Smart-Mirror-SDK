@@ -46,6 +46,10 @@ class Chunker:
                 chunks.append({"text": chunk_text, "source": str(file_path)})
         return chunks
 
+    def split(self, text: str, source: str = "") -> list[dict]:
+        """Split an in-memory string (not read from a file) into chunk dicts."""
+        return [{"text": chunk_text, "source": source} for chunk_text in self._split(text)]
+
     def _split(self, text: str) -> list[str]:
         """Split text into overlapping, whitespace-normalized chunks."""
         words = text.split()
