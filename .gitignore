@@ -11,3 +11,6 @@ mvp_supervisor.log
 smartmirror/content/.cache/
 
 .dev/
+
+# Stray node_modules at the repo root (the frontend lives in frontend/)
+/ui/
