@@ -81,11 +81,12 @@ def events_by_day(events: list[dict], chapters: dict = None) -> dict:
     return days
 
 
-def event_cards(events: list[dict], chapters: dict = None, now: datetime = None) -> list[dict]:
+def event_cards(events: list[dict], chapters: dict = None, now: datetime = None, images: dict = None) -> list[dict]:
     """Every published event for the events page: upcoming soonest first, then past ones, most recent first.
 
     An event is past once it has ended (its start, if it has no end). Cards are
-    JSON-ready: id, name, description, image (the event's image_url, or None),
+    JSON-ready: id, name, description, image (the URL of its uploaded image --
+    `images` maps image_id -> URL -- else its legacy image_url, else None),
     date (ISO, local time), chapter_name (None for the whole SB) and past.
     """
     now = now or datetime.now(timezone.utc)
@@ -98,7 +99,7 @@ def event_cards(events: list[dict], chapters: dict = None, now: datetime = None)
             "id": f"events:{e.get('_id')}",
             "name": e["title"],
             "description": e["description"],
-            "image": e.get("image_url"),
+            "image": (images or {}).get(e.get("image_id")) or e.get("image_url"),
             "date": templates.to_local(e["start"]).isoformat(),
             "chapter_name": templates.chapter_name(e, chapters),
             "past": is_past(e),

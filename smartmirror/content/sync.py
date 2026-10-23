@@ -11,15 +11,20 @@ whatever the cache already has.
 import asyncio
 import json
 import logging
+import mimetypes
+import os
 import threading
 import time
 from datetime import datetime, timezone
 
+from bson import ObjectId
+from bson.errors import InvalidId
+from gridfs import GridFSBucket, NoFile
 from pymongo import MongoClient
 from pymongo.errors import OperationFailure, PyMongoError
 
 from .cache import ContentCache
-from .config import CHAPTERED_COLLECTIONS, COLLECTIONS, CONTRACT_VERSION, ContentSyncConfig
+from .config import CHAPTERED_COLLECTIONS, COLLECTIONS, CONTRACT_VERSION, IMAGES_BUCKET, ContentSyncConfig
 from .indexer import ContentIndexer, source_id
 from . import routing, templates
 
@@ -51,6 +56,10 @@ class ContentSync:
         self.indexer = indexer
         # Indexed text names a doc's chapter, from the cached chapters.
         self.indexer.chapters = self.chapter_names
+        # Local copies of the events' uploaded images (GridFS), served by the mirror's
+        # server; it sets image_base_url to where (see SmartMirrorServer).
+        self.images_dir = config.cache_dir / "images"
+        self.image_base_url = None
         self.client = MongoClient(config.mongo_uri, tz_aware=True, serverSelectionTimeoutMS=5000)
         self.db = self.client[config.mongo_db]
 
@@ -78,7 +87,35 @@ class ContentSync:
 
     def event_cards(self, now: datetime = None) -> list[dict]:
         """Every event, upcoming then past, for the events page."""
-        return routing.event_cards(list(self.cache.docs("events").values()), self.chapter_names(), now)
+        return routing.event_cards(list(self.cache.docs("events").values()), self.chapter_names(), now, self.image_urls())
+
+    def image_urls(self) -> dict:
+        """{image_id: URL} of the images copied locally, once the server says where it serves them."""
+        if self.image_base_url is None or not self.images_dir.exists():
+            return {}
+        return {path.stem: f"{self.image_base_url}/{path.name}" for path in self.images_dir.iterdir() if path.is_file()}
+
+    def sync_images(self) -> None:
+        """Copy the cached events' uploaded images from GridFS, and drop the ones no event uses anymore."""
+        wanted = {doc["image_id"] for doc in self.cache.docs("events").values() if doc.get("image_id")}
+        self.images_dir.mkdir(parents=True, exist_ok=True)
+        have = {path.stem: path for path in self.images_dir.iterdir() if path.is_file()}
+        for image_id, path in have.items():
+            if image_id not in wanted:
+                path.unlink(missing_ok=True)
+        bucket = GridFSBucket(self.db, bucket_name=IMAGES_BUCKET)
+        for image_id in wanted - have.keys():
+            try:
+                stream = bucket.open_download_stream(ObjectId(image_id))
+            except (InvalidId, NoFile):
+                logger.warning("event image %s not found in GridFS -- the event shows the placeholder", image_id)
+                continue
+            content_type = (stream.metadata or {}).get("contentType", "")
+            extension = mimetypes.guess_extension(content_type) or ".img"
+            tmp_path = self.images_dir / f".{image_id}.tmp"
+            tmp_path.write_bytes(stream.read())
+            os.replace(tmp_path, self.images_dir / f"{image_id}{extension}")
+            logger.info("copied event image %s (%s) from the dashboard", image_id, content_type)
 
     def news(self, now: datetime = None) -> list[dict]:
         """Active announcements, then achievements, for the news widget."""
@@ -160,6 +197,7 @@ class ContentSync:
                 self._reconcile_collection(collection, force_reindex)
             if not force_reindex:
                 self._reindex_chapter_content(chapters_before)
+            self.sync_images()
             self.last_sync_at = datetime.now(timezone.utc)
             self.last_error = None
             logger.info("reconcile complete")
@@ -255,6 +293,8 @@ class ContentSync:
         self._apply_change(collection, change)
         if collection == "chapters":
             self._reindex_chapter_content(chapters_before)
+        if collection == "events":
+            self.sync_images()
 
     def _apply_change(self, collection: str, change: dict) -> None:
 
@@ -350,7 +390,8 @@ def _describe(collection: str, doc: dict, chapters: dict) -> str:
         return f"{doc['key']}: {doc['name']}"
     if collection == "events":
         where = f" @ {doc['location']}" if doc.get("location") else ""
-        return f"{templates.to_local(doc['start']):%Y-%m-%d %H:%M} {owner} {doc['title']}{where}"
+        image = f" (image {doc['image_id']})" if doc.get("image_id") else ""
+        return f"{templates.to_local(doc['start']):%Y-%m-%d %H:%M} {owner} {doc['title']}{where}{image}"
     if collection == "announcements":
         until = f" -> {templates.to_local(doc['expires_at']):%Y-%m-%d}" if doc.get("expires_at") else ""
         return f"{templates.to_local(doc['publish_at']):%Y-%m-%d}{until} {owner} ({doc.get('priority', 'normal')}) {doc['title']}"

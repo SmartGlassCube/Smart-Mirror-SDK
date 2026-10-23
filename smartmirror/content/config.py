@@ -14,6 +14,8 @@ from pathlib import Path
 
 # chapters first: the other collections' docs name their chapter when indexed.
 COLLECTIONS = ("chapters", "events", "announcements", "about", "achievements", "board")
+# GridFS bucket holding the events' uploaded images (contract v0.6).
+IMAGES_BUCKET = "images"
 # Collections whose docs may belong to a chapter (contract v0.5); no `chapter` = the whole SB.
 CHAPTERED_COLLECTIONS = ("events", "announcements", "achievements", "board")
 
@@ -21,7 +23,7 @@ CHAPTERED_COLLECTIONS = ("events", "announcements", "achievements", "board")
 # code was built against. sync.py refuses to touch the cache/Qdrant if the
 # Mongo it's talking to reports a different *major* version (the part
 # before the first "."); a minor difference is treated as compatible.
-CONTRACT_VERSION = "0.5"
+CONTRACT_VERSION = "0.6"
 
 DEFAULT_MONGO_URI = "mongodb://localhost:27017/ieee?directConnection=true"
 DEFAULT_MONGO_DB = "ieee"

@@ -335,3 +335,40 @@ def test_reconcile_prints_the_content_that_came_from_the_dashboard(mongo_db, con
     assert "[Computer Society] CS Workshop @ Lab 3" in dump
     assert "Draft Event" not in dump
     assert "calendar (1 days with events)" in dump
+
+
+def _upload_image(mongo_db, data=b"\x89PNG fake", content_type="image/png"):
+    from gridfs import GridFSBucket
+
+    return str(GridFSBucket(mongo_db, bucket_name="images").upload_from_stream(
+        "poster.png", data, metadata={"contentType": content_type, "uploaded_by": "test"},
+    ))
+
+
+def test_event_images_are_copied_from_gridfs_and_dropped_when_unused(mongo_db, content_sync):
+    image_id = _upload_image(mongo_db)
+    event_id = make_event(mongo_db, title="With Poster", image_id=image_id)
+    make_event(mongo_db, title="No Poster")
+    content_sync.reconcile()
+
+    copy = content_sync.images_dir / f"{image_id}.png"
+    assert copy.read_bytes() == b"\x89PNG fake"
+
+    content_sync.image_base_url = "http://localhost:8080/content-images"
+    cards = {card["name"]: card for card in content_sync.event_cards()}
+    assert cards["With Poster"]["image"] == f"http://localhost:8080/content-images/{image_id}.png"
+    assert cards["No Poster"]["image"] is None
+
+    mongo_db.events.update_one({"_id": event_id}, {"$unset": {"image_id": ""}, "$set": {"updated_at": utcnow()}})
+    content_sync.reconcile()
+    assert not copy.exists()
+
+
+def test_missing_gridfs_image_falls_back_to_the_placeholder(mongo_db, content_sync):
+    from bson import ObjectId
+
+    make_event(mongo_db, title="Lost Poster", image_id=str(ObjectId()))
+    content_sync.reconcile()
+    content_sync.image_base_url = "http://localhost:8080/content-images"
+
+    assert content_sync.event_cards()[0]["image"] is None

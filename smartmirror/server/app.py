@@ -1,10 +1,14 @@
 import asyncio
 import logging
+import mimetypes
 import threading
 import time
+from http import HTTPStatus
 
 import cv2
 import websockets
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 
 from ..core import StateManager
 from ..hal import HAL
@@ -14,6 +18,10 @@ from .frontend_launcher import FrontendLauncher
 from .hand_pointer import HandPointer
 from .websocket import ClientHub
 from .widget_data import refresh_widget_data
+
+# The events' uploaded images (content sync's local copies) are served over plain
+# HTTP on the WebSocket port, under this path.
+CONTENT_IMAGES_PATH = "/content-images"
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +85,8 @@ class SmartMirrorServer:
         # Opt-in Mongo content sync (smartmirror.content) -- None (default)
         # means the mirror behaves exactly as before. See examples/mvp.py.
         self.content_sync = content_sync
+        if content_sync is not None:
+            content_sync.image_base_url = f"http://{ws_host}:{ws_port}{CONTENT_IMAGES_PATH}"
         # Stops the background loops (content sync, voice assistant).
         self._stop_event = threading.Event()
 
@@ -88,7 +98,9 @@ class SmartMirrorServer:
         print(f"[Server] WebSocket server on ws://{self.ws_host}:{self.ws_port}")
         self.running = True
         try:
-            async with websockets.serve(self.hub.handle_client, self.ws_host, self.ws_port):
+            async with websockets.serve(
+                self.hub.handle_client, self.ws_host, self.ws_port, process_request=self._serve_content_image
+            ):
                 if self.frontend is not None:
                     await self.frontend.start()
                 tasks = [self._main_loop()]
@@ -101,6 +113,23 @@ class SmartMirrorServer:
             self._stop_background_loops()
             if self.frontend is not None:
                 await self.frontend.stop()
+
+    def _serve_content_image(self, connection, request):
+        """GET /content-images/<file>: an event image. Any other request goes on to the WebSocket handshake."""
+        path = request.path.split("?", 1)[0]
+        if not path.startswith(CONTENT_IMAGES_PATH + "/"):
+            return None
+        name = path[len(CONTENT_IMAGES_PATH) + 1:]
+        file = self.content_sync.images_dir / name if self.content_sync is not None else None
+        if file is None or "/" in name or name.startswith(".") or not file.is_file():
+            return connection.respond(HTTPStatus.NOT_FOUND, "Not found\n")
+        body = file.read_bytes()
+        headers = Headers({
+            "Content-Type": mimetypes.guess_type(name)[0] or "application/octet-stream",
+            "Content-Length": str(len(body)),
+            "Cache-Control": "max-age=86400",
+        })
+        return Response(HTTPStatus.OK, "OK", headers, body)
 
     async def _content_sync_loop(self):
         try:
