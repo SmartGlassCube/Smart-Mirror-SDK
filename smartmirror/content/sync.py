@@ -21,7 +21,7 @@ from pymongo.errors import OperationFailure, PyMongoError
 from .cache import ContentCache
 from .config import COLLECTIONS, CONTRACT_VERSION, ContentSyncConfig
 from .indexer import ContentIndexer, source_id
-from . import routing
+from . import routing, templates
 
 logger = logging.getLogger(__name__)
 
@@ -116,9 +116,13 @@ class ContentSync:
             self.last_error = str(error)
 
     def _check_embedding_model(self) -> bool:
-        """Return True (and wipe Qdrant) if the embedding model/collection changed since last boot."""
+        """Return True (and wipe Qdrant) if the embedding model/collection or the text templates changed since last boot."""
         sidecar = self.config.cache_dir / "embedding_model.json"
-        current = {"model": self.indexer.embedder.model_name, "collection": self.indexer.store.collection_name}
+        current = {
+            "model": self.indexer.embedder.model_name,
+            "collection": self.indexer.store.collection_name,
+            "templates": templates.TEMPLATE_VERSION,
+        }
         stored = None
         if sidecar.exists():
             try:

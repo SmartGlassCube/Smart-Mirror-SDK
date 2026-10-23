@@ -192,6 +192,22 @@ def test_embedding_model_mismatch_triggers_full_rebuild(mongo_db, content_sync):
     assert current["model"] == content_sync.indexer.embedder.model_name
 
 
+def test_template_version_change_triggers_full_rebuild(mongo_db, content_sync, monkeypatch):
+    from smartmirror.content import templates
+
+    make_event(mongo_db, title="Re-render Me")
+    content_sync.reconcile()
+    upserted = []
+    monkeypatch.setattr(content_sync.indexer, "upsert", lambda collection, doc: upserted.append(doc["title"]))
+
+    content_sync.reconcile()  # nothing changed: nothing re-indexed
+    assert upserted == []
+
+    monkeypatch.setattr(templates, "TEMPLATE_VERSION", templates.TEMPLATE_VERSION + 1)
+    content_sync.reconcile()  # unchanged doc, new templates: re-indexed
+    assert "Re-render Me" in upserted
+
+
 def test_heartbeat_upserts_mirror_status(mongo_db, content_sync):
     content_sync.heartbeat(current_page="home")
     doc = mongo_db.mirror_status.find_one({"mirror_id": content_sync.config.mirror_id})
