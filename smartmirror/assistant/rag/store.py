@@ -38,28 +38,50 @@ class VectorStore:
             },
         )
 
-    def add(self, chunks: list[dict], embeddings: list[list[float]]) -> None:
+    def add(self, chunks: list[dict], embeddings: list[list[float]], ids: list[str] = None) -> None:
         """Add chunks and their embeddings to the store.
 
         Args:
             chunks: list of {"text": str, "source": str} dicts, as produced
                 by Chunker.load.
             embeddings: parallel list of embedding vectors, one per chunk.
+            ids: optional parallel list of point ids (str/UUID); random
+                UUIDs are used if omitted. Pass deterministic ids (e.g.
+                uuid5 of a stable key) when callers need idempotent upserts.
         """
         if len(chunks) != len(embeddings):
             raise ValueError("chunks and embeddings must be the same length")
         if not chunks:
             return
+        if ids is None:
+            ids = [str(uuid.uuid4()) for _ in chunks]
 
         points = [
             models.PointStruct(
-                id=str(uuid.uuid4()),
+                id=id_,
                 vector={DENSE_VECTOR_NAME: embedding},
                 payload={"text": chunk["text"], "source": chunk.get("source", "")},
             )
-            for chunk, embedding in zip(chunks, embeddings)
+            for id_, chunk, embedding in zip(ids, chunks, embeddings)
         ]
         self._client.upsert(collection_name=self.collection_name, points=points)
+
+    def delete_by_source(self, source: str) -> None:
+        """Delete every point whose payload["source"] equals `source`."""
+        self._client.delete(
+            collection_name=self.collection_name,
+            points_selector=models.FilterSelector(
+                filter=models.Filter(
+                    must=[models.FieldCondition(key="source", match=models.MatchValue(value=source))]
+                )
+            ),
+        )
+
+    def clear(self) -> None:
+        """Drop and recreate the collection (used when the embedding model changes)."""
+        if self._client.collection_exists(self.collection_name):
+            self._client.delete_collection(self.collection_name)
+        self._ensure_collection()
 
     def query(self, query_embedding: list[float], top_k: int = 4) -> list[dict]:
         """Find the top_k chunks nearest to query_embedding.

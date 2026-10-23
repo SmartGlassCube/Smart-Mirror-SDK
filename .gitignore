@@ -7,3 +7,7 @@ __pycache__/
 .env
 .qdrant_data/
 mvp_supervisor.log
+
+smartmirror/content/.cache/
+
+.dev/
