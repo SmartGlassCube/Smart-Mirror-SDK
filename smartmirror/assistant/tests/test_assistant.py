@@ -8,7 +8,9 @@ CI-friendly form; `scripts/assistant_acceptance_check.py` runs the same
 flow against a real LLM endpoint when you have credentials.
 """
 
+import asyncio
 import functools
+import threading
 import time
 from unittest.mock import MagicMock
 
@@ -16,6 +18,7 @@ import pytest
 
 from smartmirror.assistant import assistant as assistant_module
 from smartmirror.assistant import Assistant
+from smartmirror.assistant.llm import LLMBackend
 from smartmirror.assistant.rag import VectorStore
 
 
@@ -58,6 +61,68 @@ def test_chat_updates_history(isolated_vector_store, seed_corpus_path, fake_back
 
     a.reset_history()
     assert a.history == []
+
+
+class _ScriptedBackend(LLMBackend):
+    """Returns `replies` in order, one per call: the answer, then the shortened answer."""
+
+    def __init__(self, *replies):
+        self.replies = list(replies)
+        self.calls = []
+
+    def complete(self, messages, tools=None):
+        self.calls.append(messages)
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
+LONG_ANSWER = " ".join(["word"] * 50) + "."
+
+
+def test_short_answer_is_kept_as_is(isolated_vector_store):
+    backend = _ScriptedBackend("The workshop is at 14:00.")
+    a = Assistant(llm=backend, max_answer_words=10)
+
+    assert a.chat("When is the workshop?") == "The workshop is at 14:00."
+    assert len(backend.calls) == 1
+
+
+def test_long_answer_is_reformulated_shorter(isolated_vector_store):
+    backend = _ScriptedBackend(LONG_ANSWER, "The workshop is at 14:00.")
+    a = Assistant(llm=backend, max_answer_words=10)
+
+    answer = a.chat("When is the workshop?")
+
+    assert answer == "The workshop is at 14:00."
+    shorten_messages = backend.calls[1]
+    assert "at most 10 words" in shorten_messages[0]["content"]
+    assert "When is the workshop?" in shorten_messages[1]["content"]
+    assert LONG_ANSWER in shorten_messages[1]["content"]
+    # what was said is what the conversation remembers
+    assert a.history[-1] == {"role": "assistant", "content": "The workshop is at 14:00."}
+
+
+def test_reformulation_still_too_long_is_trimmed_to_whole_sentences(isolated_vector_store):
+    backend = _ScriptedBackend(LONG_ANSWER, "The workshop is at 14:00. It is in room B12 on the second floor.")
+    a = Assistant(llm=backend, max_answer_words=8)
+
+    assert a.chat("When is the workshop?") == "The workshop is at 14:00."
+
+
+def test_failed_reformulation_trims_the_original_answer(isolated_vector_store):
+    backend = _ScriptedBackend(LONG_ANSWER, RuntimeError("LLM down"))
+    a = Assistant(llm=backend, max_answer_words=10)
+
+    assert a.chat("When is the workshop?") == " ".join(["word"] * 10) + "..."
+
+
+def test_max_answer_words_none_disables_shortening(isolated_vector_store):
+    backend = _ScriptedBackend(LONG_ANSWER)
+    a = Assistant(llm=backend, max_answer_words=None)
+
+    assert a.chat("When is the workshop?") == LONG_ANSWER
 
 
 def test_add_documents_makes_them_retrievable(isolated_vector_store, tmp_path, fake_backend):
@@ -248,6 +313,77 @@ async def test_listen_loop_uses_the_hal_passed_in_over_the_default(isolated_vect
 
     assert a.hal is other_hal
 
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_reports_the_question_then_the_answer_before_speaking_it(
+    isolated_vector_store, fake_backend, monkeypatch
+):
+    """on_question fires before the LLM call and on_answer before TTS, so a UI
+    can react while the answer is still being generated/spoken."""
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=None)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "a question")
+
+    calls = []
+    real_chat = a.chat
+    monkeypatch.setattr(a, "chat", lambda message: calls.append("chat") or real_chat(message))
+    monkeypatch.setattr(a.tts, "speak", lambda text: calls.append(("speak", text)))
+
+    async def on_question(question):
+        calls.append(("question", question))
+
+    def on_result(payload):
+        calls.append("result")
+        raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(
+            on_question=on_question,
+            on_answer=lambda answer: calls.append(("answer", answer)),
+            on_result=on_result,
+        )
+
+    assert calls == [("question", "a question"), "chat", ("answer", "the answer"), ("speak", "the answer"), "result"]
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_wake_word_alone_wakes_without_answering_and_opens_the_window(
+    isolated_vector_store, fake_backend, monkeypatch
+):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=60)
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", lambda audio_blocks: "")
+    monkeypatch.setattr(a.stt, "listen", lambda hal, deadline=None: "the follow-up")
+
+    questions = []
+    results = []
+
+    def on_result(payload):
+        results.append(payload)
+        raise _StopLoop
+
+    with pytest.raises(_StopLoop):
+        await a.listen_loop(on_question=questions.append, on_result=on_result)
+
+    # "" = wake word heard alone (no LLM call); the follow-up needed no wake word
+    assert questions == ["", "the follow-up"]
+    assert results == [{"transcript": "the follow-up", "answer": "the answer"}]
+
+
+@pytest.mark.asyncio
+async def test_listen_loop_returns_once_stop_event_is_set(isolated_vector_store, fake_backend, monkeypatch):
+    a = Assistant(llm=fake_backend(reply="the answer"), stt=True, wake_window_seconds=None)
+    stop_event = threading.Event()
+
+    def heard_while_shutting_down(audio_blocks):
+        stop_event.set()
+        return ""  # what listen_for_wake_word returns once HAL.close() ends the stream
+
+    monkeypatch.setattr(a.wake_word_detector, "listen_for_wake_word", heard_while_shutting_down)
+    questions = []
+
+    await asyncio.wait_for(a.listen_loop(on_question=questions.append, stop_event=stop_event), timeout=5)
+
+    assert questions == []  # a turn interrupted by shutdown isn't reported
 
 def test_default_wake_window_is_180_seconds(isolated_vector_store, fake_backend):
     a = Assistant(llm=fake_backend(), stt=True)

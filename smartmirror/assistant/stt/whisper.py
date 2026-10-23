@@ -6,6 +6,7 @@ are downloaded by pywhispercpp itself on first use.
 """
 
 import logging
+import re
 
 import numpy as np
 
@@ -13,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "base.en"
 WHISPER_SAMPLE_RATE = 16000
+
+# Whisper's non-speech annotations: "[BLANK_AUDIO]", "[ Background noise ]",
+# "[INTERPOSING VOICES]", "(music)", "*laughs*", ... Seen constantly in a noisy
+# room; left in, they'd reach the LLM as a "question" during the wake window.
+NON_SPEECH_PATTERN = re.compile(r"\[[^\]]*\]|\([^)]*\)|\*[^*]*\*")
 
 # whisper.cpp defaults to min(4, cpu_count()) inference threads of its own,
 # on top of mediapipe's XNNPACK thread pool (camera_loop) and PortAudio's
@@ -57,12 +63,16 @@ class WhisperSTT:
         return self._model
 
     def transcribe(self, audio: np.ndarray) -> str:
-        """Transcribe mono audio sampled at 16kHz (int16 or float32) to text."""
+        """Transcribe mono audio sampled at 16kHz (int16 or float32) to text.
+
+        Non-speech annotations (see NON_SPEECH_PATTERN) are dropped, so noise
+        alone transcribes to "".
+        """
         model = self._ensure_model()
         segments = model.transcribe(self._normalize(audio))
         text = " ".join(segment.text.strip() for segment in segments).strip()
         logger.info("Whisper transcript: %r", text)
-        return text
+        return " ".join(NON_SPEECH_PATTERN.sub(" ", text).split())
 
     def listen(self, hal, deadline: float = None) -> str:
         """Capture one VAD-gated utterance from `hal` and transcribe it.

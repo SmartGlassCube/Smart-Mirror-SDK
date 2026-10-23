@@ -16,11 +16,18 @@
   opacity: 0.8;
 }
 
-.camera-preview {
+/* Top-right corner: the voice transcript, then the camera preview. */
+.mirror-corner {
   position: absolute;
   top: calc(var(--px) * 3);
   right: calc(var(--px) * 3);
   z-index: 10;
+  display: flex;
+  align-items: flex-start;
+  gap: calc(var(--px) * 3);
+}
+
+.camera-preview {
   width: calc(var(--u) * 160);
   opacity: 0.85;
 }
@@ -36,6 +43,40 @@
   font-size: calc(var(--u) * 18);
   color: var(--px-orange);
   text-align: right;
+}
+
+/* What the chatbot heard (see VoiceTranscript.tsx): Abdo's 8-bit speech bubble frame, without the tail. */
+.speech-bubble.voice-transcript {
+  max-width: calc(var(--u) * 400);
+}
+
+.voice-transcript__label {
+  margin-bottom: var(--px);
+  font-family: var(--font-pixel-title);
+  font-size: calc(var(--u) * 10);
+  color: var(--px-purple);
+  text-transform: uppercase;
+}
+
+/* Up to four lines, like the speech bubble's text but clamped instead of scrolled. */
+.voice-transcript__text {
+  display: -webkit-box;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+}
+
+.voice-transcript__text--waiting {
+  animation: voice-transcript-blink 0.8s steps(2, jump-none) infinite alternate;
+}
+
+@keyframes voice-transcript-blink {
+  to {
+    opacity: 0.4;
+  }
 }
 
 .mirror-page {

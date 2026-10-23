@@ -9,11 +9,15 @@ behaving the same:
 - read_audio() yields mono int16 blocks at self.samplerate, resampling on
   the fly if the underlying device doesn't natively support that rate.
 - play_audio() blocks until playback of the given samples finishes.
+- close() makes read_audio() streams end, so a thread blocked waiting for
+  speech can return when the app shuts down.
 
 sounddevice is imported lazily inside the methods that need it, so
 importing this module (or constructing a HAL that's never used for audio)
 doesn't require it to be installed.
 """
+
+import threading
 
 import numpy as np
 
@@ -35,9 +39,14 @@ class HAL:
         self.blocksize = blocksize
         self.input_device = input_device
         self.output_device = output_device
+        self._closed = threading.Event()
+
+    def close(self) -> None:
+        """End every read_audio() stream after its current block."""
+        self._closed.set()
 
     def read_audio(self):
-        """Yield mono int16 audio blocks at self.samplerate from the microphone, forever."""
+        """Yield mono int16 audio blocks at self.samplerate from the microphone, until close()."""
         import sounddevice as sd
 
         device_rate = self._resolve_input_samplerate()
@@ -50,7 +59,7 @@ class HAL:
             blocksize=block_in,
             device=self.input_device,
         ) as stream:
-            while True:
+            while not self._closed.is_set():
                 block, _overflowed = stream.read(block_in)
                 block = block[:, 0] if block.ndim > 1 else block
                 if device_rate != self.samplerate:

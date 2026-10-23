@@ -299,7 +299,7 @@ To check gestures live on a camera, use `examples/gesture_detector_debug.py`.
 **Working:** hand tracking, the six gesture types, custom gestures/widgets/pages from app code, page-graph navigation, `TextWidget` item/section navigation, pinch-drag of any draggable widget, pluggable data providers, the WebSocket state sync, the auto-launched React UI, and the debug overlay.
 
 **Stubs / not wired yet**
-- `HAL` and `Assistant` are empty placeholders (`SmartMirrorServer(hardware=..., assistant=...)` only stores them).
+- Voice assistant UI is minimal: `SmartMirrorServer(assistant=...)` runs `Assistant.listen_loop` when the assistant was built with `stt=True`: a heard question sends `ASSISTANT_WAKE`, the answer sends `ASSISTANT_SAY` while TTS speaks it. There are no separate "listening"/"transcript" messages yet.
 - `ClickGesture` and `ZoomGesture` events are detected but have no default bindings. Use `event_bindings` or a widget's `gestures` to act on them.
 - The React `WeatherWidget` and `NewsWidget` render static content and ignore `data`.
 - The protocol is one-way: client messages are only logged.
