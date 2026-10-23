@@ -6,6 +6,7 @@ from pathlib import Path
 from smartmirror.assistant import Assistant
 from smartmirror.assistant.llm import OpenAICompatBackend
 from smartmirror.core import StateManager
+from smartmirror.hal import HAL
 from smartmirror.server import SmartMirrorServer
 from smartmirror.widgets import (
     CalendarWidget,
@@ -16,7 +17,11 @@ from smartmirror.widgets import (
     TextWidget,
     WeatherWidget,
 )
-from smartmirror.widgets.providers import MongoCalendarProvider, OpenMeteoWeatherProvider, QRCodeCatalogProvider
+from smartmirror.widgets.providers import (
+    MongoCalendarProvider,
+    OpenMeteoWeatherProvider,
+    QRCodeCatalogProvider,
+)
 
 # INFO on the smartmirror.* loggers surfaces the voice pipeline's own
 # play-by-play (VAD detections, raw Whisper transcripts, wake-word
@@ -50,14 +55,22 @@ def build_assistant(content_sync=None):
         base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1"),
         model=os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b"),
     )
+    audio_hal = HAL(
+        input_stream_url=os.getenv(
+            "SMARTMIRROR_AUDIO_FEED_URL",
+            "http://192.168.1.175:5000/audio_feed",
+        )
+    )
     if content_sync is not None:
         return Assistant(
-            llm=backend, stt=True, tts=True,
+            llm=backend, stt=True, tts=True, hal=audio_hal,
             store=content_sync.indexer.store,
             extra_context=content_sync.prompt_block,
         )
     seed_corpus = Path(__file__).resolve().parent.parent / "smartmirror" / "assistant" / "rag" / "seed_corpus"
-    return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
+    return Assistant(
+        llm=backend, documents=str(seed_corpus), stt=True, tts=True, hal=audio_hal
+    )
 
 
 def fallback_calendar_provider():

@@ -11,13 +11,17 @@ behaving the same:
 - play_audio() blocks until playback of the given samples finishes.
 - close() makes read_audio() streams end, so a thread blocked waiting for
   speech can return when the app shuts down.
+- input_stream_url can provide raw mono PCM over HTTP instead of a local mic.
 
 sounddevice is imported lazily inside the methods that need it, so
 importing this module (or constructing a HAL that's never used for audio)
 doesn't require it to be installed.
 """
 
+import socket
 import threading
+import urllib.request
+from typing import Optional
 
 import numpy as np
 
@@ -33,12 +37,18 @@ class HAL:
         blocksize: int = DEFAULT_BLOCKSIZE,
         input_device=None,
         output_device=None,
+        input_stream_url: Optional[str] = None,
+        input_stream_samplerate: Optional[int] = None,
     ):
         self.samplerate = samplerate
         self.channels = channels
         self.blocksize = blocksize
         self.input_device = input_device
         self.output_device = output_device
+        self.input_stream_url = input_stream_url
+        self.input_stream_samplerate = (
+            input_stream_samplerate if input_stream_samplerate is not None else samplerate
+        )
         self._closed = threading.Event()
 
     def close(self) -> None:
@@ -47,6 +57,10 @@ class HAL:
 
     def read_audio(self):
         """Yield mono int16 audio blocks at self.samplerate from the microphone, until close()."""
+        if self.input_stream_url is not None:
+            yield from self._read_http_audio()
+            return
+
         import sounddevice as sd
 
         device_rate = self._resolve_input_samplerate()
@@ -65,6 +79,36 @@ class HAL:
                 if device_rate != self.samplerate:
                     block = resample_int16(block, device_rate, self.samplerate)
                 yield block
+
+    def _read_http_audio(self):
+        """Read mono signed 16-bit little-endian PCM blocks from an HTTP response."""
+        if self._closed.is_set():
+            return
+
+        block_in = max(
+            1, round(self.blocksize * self.input_stream_samplerate / self.samplerate)
+        )
+        block_bytes = block_in * 2
+        buffer = bytearray()
+
+        with urllib.request.urlopen(self.input_stream_url, timeout=1) as response:
+            while not self._closed.is_set():
+                try:
+                    chunk = response.read1(max(1, block_bytes - len(buffer)))
+                except (TimeoutError, socket.timeout):
+                    continue
+                if not chunk:
+                    break
+                buffer.extend(chunk)
+                if len(buffer) >= block_bytes:
+                    raw_block = bytes(buffer[:block_bytes])
+                    del buffer[:block_bytes]
+                    block = np.frombuffer(raw_block, dtype="<i2").astype(np.int16, copy=False)
+                    if self.input_stream_samplerate != self.samplerate:
+                        block = resample_int16(
+                            block, self.input_stream_samplerate, self.samplerate
+                        )
+                    yield block
 
     def play_audio(self, samples: np.ndarray, samplerate: int) -> None:
         """Blocking playback of mono samples at `samplerate` through the speaker."""
