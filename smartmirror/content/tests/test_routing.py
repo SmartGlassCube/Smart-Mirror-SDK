@@ -140,3 +140,21 @@ def test_build_prompt_block_lists_the_chapters_and_labels_chapter_events():
     assert "Computer Society chapter event: Workshop." in block
     assert "IEEE INSAT Student Branch chapters: Computer Society, Robotics and Automation Society." in block
     assert "Power and Energy" not in block
+
+
+def test_event_cards_list_every_event_upcoming_first_then_past_newest_first():
+    cards = routing.event_cards([
+        _event(_id="old", title="Old", start=NOW - timedelta(days=60)),
+        _event(_id="later", title="Later", start=NOW + timedelta(days=10), image_url="https://example.com/later.png"),
+        _event(_id="recent", title="Recent", start=NOW - timedelta(days=2)),
+        _event(_id="soon", title="Soon", start=NOW + timedelta(days=1), chapter="cs"),
+        _event(_id="ongoing", title="Ongoing", start=NOW - timedelta(hours=1), end=NOW + timedelta(hours=2)),
+        _event(_id="draft", title="Draft", status="draft"),
+    ], {"cs": "Computer Society"}, NOW)
+
+    assert [c["name"] for c in cards] == ["Ongoing", "Soon", "Later", "Recent", "Old"]
+    assert [c["past"] for c in cards] == [False, False, False, True, True]
+    assert cards[2]["image"] == "https://example.com/later.png"
+    assert cards[1]["image"] is None  # the page shows the "?" placeholder
+    assert cards[1]["chapter_name"] == "Computer Society"
+    assert cards[1]["date"] == "2026-01-02T01:00:00+01:00"

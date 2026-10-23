@@ -179,12 +179,8 @@ if __name__ == "__main__":
     if content_sync is not None:
         events = EventsWidget(
             position={"x": 0.5, "y": 0.4},
-            data_provider=lambda _widget=None: {
-                "items": [
-                    {"id": f"events:{doc['_id']}", "name": doc["title"], "description": doc["description"]}
-                    for doc in content_sync.widget_data("events")
-                ]
-            },
+            # Every event, upcoming then past, with its image (a "?" placeholder without one).
+            data_provider=lambda _widget=None: {"items": content_sync.event_cards()},
             refresh_interval=30,
             draggable=False,
         )

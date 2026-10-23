@@ -81,6 +81,32 @@ def events_by_day(events: list[dict], chapters: dict = None) -> dict:
     return days
 
 
+def event_cards(events: list[dict], chapters: dict = None, now: datetime = None) -> list[dict]:
+    """Every published event for the events page: upcoming soonest first, then past ones, most recent first.
+
+    An event is past once it has ended (its start, if it has no end). Cards are
+    JSON-ready: id, name, description, image (the event's image_url, or None),
+    date (ISO, local time), chapter_name (None for the whole SB) and past.
+    """
+    now = now or datetime.now(timezone.utc)
+    published = [e for e in events if is_published(e)]
+    is_past = lambda e: _aware(e.get("end") or e["start"]) < now  # noqa: E731
+    upcoming = sorted((e for e in published if not is_past(e)), key=lambda e: _aware(e["start"]))
+    past = sorted((e for e in published if is_past(e)), key=lambda e: _aware(e["start"]), reverse=True)
+    return [
+        {
+            "id": f"events:{e.get('_id')}",
+            "name": e["title"],
+            "description": e["description"],
+            "image": e.get("image_url"),
+            "date": templates.to_local(e["start"]).isoformat(),
+            "chapter_name": templates.chapter_name(e, chapters),
+            "past": is_past(e),
+        }
+        for e in upcoming + past
+    ]
+
+
 def news_items(announcements: list[dict], achievements: list[dict], chapters: dict = None, now: datetime = None) -> list[dict]:
     """The News widget's feed: active announcements (high priority first), then achievements, newest first."""
     items = [

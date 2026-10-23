@@ -76,6 +76,10 @@ class ContentSync:
         """Every event keyed by local day, for the calendar widget: {"2026-10-28": [event, ...]}."""
         return routing.events_by_day(list(self.cache.docs("events").values()), self.chapter_names())
 
+    def event_cards(self, now: datetime = None) -> list[dict]:
+        """Every event, upcoming then past, for the events page."""
+        return routing.event_cards(list(self.cache.docs("events").values()), self.chapter_names(), now)
+
     def news(self, now: datetime = None) -> list[dict]:
         """Active announcements, then achievements, for the news widget."""
         return routing.news_items(
