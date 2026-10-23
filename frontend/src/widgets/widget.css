@@ -81,6 +81,45 @@
   opacity: 0.7;
 }
 
+/* News ticker (see NewsWidget.tsx): one line scrolling right to left. */
+.news-ticker {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Two copies of the run side by side; moving by -50% lands the copy where the first began. */
+.news-ticker__track {
+  display: flex;
+  flex-shrink: 0;
+  animation: news-ticker-scroll linear infinite;
+}
+
+.news-ticker__run {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.news-ticker__item {
+  padding-right: calc(var(--px) * 12);
+}
+
+@keyframes news-ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .news-ticker__track {
+    animation: none;
+  }
+}
+
 .games-widget {
   max-width: none;
 }
