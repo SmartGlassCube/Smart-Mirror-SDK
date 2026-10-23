@@ -34,14 +34,16 @@ class SmartMirrorServer:
     Pass an `assistant` built with `stt=True` to run the voice chatbot alongside,
     shown by the Abdo avatar in the frontend.
     """
-
+    #This is used to stream the video feed from a PC camera. You can change the IP address and port to match your setup.
+    PC_STREAM_URL = "http://192.168.1.175:5000/video_feed",
+    
     def __init__(
         self,
         graph=None,
         state_manager=None,
         gesture_detector=None,
         with_camera=True,
-        camera_id=0,
+        camera_id=PC_STREAM_URL,
         camera_preview=True,
         camera_preview_fps=10,
         camera_preview_width=240,
