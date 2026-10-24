@@ -15,7 +15,10 @@ PID_DIR="$DEV_DIR/pids"
 CONTENT_SYNC_SCRIPT="$HERE/scripts/content_sync_daemon.py"
 CONTENT_SYNC_MIRROR_ID="dev-content-sync"
 
-DASHBOARD_HINT="start it from the Dashboard repo: ../Dashboard/dev.sh up (or, for Atlas, check MONGO_URI in .env and the cluster's IP access list)"
+# Shown when Mongo can't be reached. A local Mongo is the one the Dashboard
+# repo's ./dev.sh up starts on this machine; Atlas needs nothing started here.
+local_mongo_hint() { echo "start it from the Dashboard repo on this machine: ../Dashboard/dev.sh up"; }
+atlas_hint() { echo "check MONGO_URI in this repo's .env, and that this machine's public IP is in the Atlas cluster's IP access list"; }
 
 log() { echo "dev.sh: $*"; }
 die() { echo "dev.sh: ERROR: $*" >&2; exit 1; }
@@ -78,20 +81,30 @@ mongo_label() {
 
 # -- helpers ------------------------------------------------------------------
 
-mongo_reachable() {
+# Prints why Mongo can't be reached -- credentials stripped -- or nothing if it can.
+mongo_ping_error() {
+  [ -x "$HERE/.venv/bin/python" ] || { echo ".venv is missing (run ./dev.sh up once to create it)"; return; }
   "$HERE/.venv/bin/python" -c "
-import os, sys
-from pymongo import MongoClient
-from pymongo.errors import PyMongoError
+import os, re
 try:
+    from pymongo import MongoClient
     MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS'])).admin.command('ping')
-except PyMongoError:
-    sys.exit(1)
-" 2>/dev/null
+except ImportError as error:
+    print(f'{error} -- the data extra is not installed in .venv')
+except Exception as error:
+    print(type(error).__name__ + ': ' + re.sub(r'://[^/?@ ]*@', '://', str(error))[:400])
+" 2>&1
+}
+
+mongo_hint() {
+  if mongo_uri_is_local; then local_mongo_hint; else atlas_hint; fi
 }
 
 require_mongo() {
-  mongo_reachable || die "$DASHBOARD_HINT"
+  local reason
+  reason="$(mongo_ping_error)"
+  [ -z "$reason" ] || die "can't reach Mongo ($(mongo_label)): $reason
+  -> $(mongo_hint)"
 }
 
 wait_for_mongo_truthy() {
@@ -159,8 +172,8 @@ start_content_sync() {
     log "content-sync: already running (pid $(cat "$PID_DIR/content-sync.pid"))"
     return 0
   fi
-  require_mongo
   ensure_root_venv_extras
+  require_mongo
   mkdir -p "$LOG_DIR" "$PID_DIR"
   (
     cd "$HERE"
@@ -200,16 +213,19 @@ cmd_down() {
 cmd_status() {
   load_env
   echo "Mongo: $(mongo_label)"
-  if mongo_reachable; then
+  local reason
+  reason="$(mongo_ping_error)"
+  if [ -z "$reason" ]; then
     echo "  reachable"
   else
-    echo "  NOT reachable -- $DASHBOARD_HINT"
+    echo "  NOT reachable: $reason"
+    echo "  -> $(mongo_hint)"
   fi
   echo
   echo "Content sync:"
   if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
     echo "  up (pid $(cat "$PID_DIR/content-sync.pid"))"
-    if mongo_reachable; then
+    if [ -z "$reason" ]; then
       "$HERE/.venv/bin/python" -c "
 import os
 from pymongo import MongoClient
@@ -241,6 +257,7 @@ cmd_logs() {
 
 cmd_mirror() {
   load_env
+  ensure_root_venv_extras
   require_mongo
   # examples/mvp.py does its own full Mongo<->Qdrant sync; it can't share
   # Qdrant's embedded storage lock with the standalone content-sync daemon
