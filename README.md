@@ -58,12 +58,15 @@ re-trims back to just the defaults -- that's the one command to avoid).
 from the environment and skip with a clear message (pointing at
 `../Dashboard/dev.sh up`) if it's not reachable, rather than failing.
 
-The example app reads camera video from `http://localhost:5000/video_feed`
-and microphone audio from `http://localhost:5000/audio_feed` by default. Set
-`SMARTMIRROR_AUDIO_FEED_URL` to override the audio endpoint. The audio HTTP
+When running the mirror on a Raspberry Pi and `stream_cam.py` on a PC at
+`192.168.1.175`, the app reads camera video from
+`http://192.168.1.175:5000/video_feed` and microphone audio from
+`http://192.168.1.175:5000/audio_feed`. Update the defaults in
+`smartmirror/server/app.py` and `examples/mvp.py` if the PC's LAN IP changes;
+`SMARTMIRROR_AUDIO_FEED_URL` overrides the audio endpoint. The audio HTTP
 response body must be a continuous stream of mono, signed 16-bit
-little-endian PCM at 16 kHz; speaker playback remains on the local output
-device.
+little-endian PCM at 16 kHz; speaker playback remains on the Pi's local
+output device.
 
 - [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): architecture and module tour
 - [docs/extending.md](docs/extending.md): add your own gestures, widgets and pages

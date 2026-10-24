@@ -7,7 +7,7 @@ from smartmirror.server import SmartMirrorServer
 def test_server_defaults_to_localhost_video_feed():
     server = SmartMirrorServer(with_camera=False, with_frontend=False)
 
-    assert server.camera_id == "http://localhost:5000/video_feed"
+    assert server.camera_id == "http://192.168.1.175:5000/video_feed"
 
 
 class FakeAssistant:

@@ -58,7 +58,7 @@ def build_assistant(content_sync=None):
     audio_hal = HAL(
         input_stream_url=os.getenv(
             "SMARTMIRROR_AUDIO_FEED_URL",
-            "http://localhost:5000/audio_feed",
+            "http://192.168.1.175:5000/audio_feed",
         )
     )
     if content_sync is not None:

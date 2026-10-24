@@ -34,7 +34,7 @@ class SmartMirrorServer:
     Pass an `assistant` built with `stt=True` to run the voice chatbot alongside,
     shown by the Abdo avatar in the frontend.
     """
-    PC_STREAM_URL = "http://localhost:5000/video_feed"
+    PC_STREAM_URL = "http://192.168.1.175:5000/video_feed"
 
     def __init__(
         self,
