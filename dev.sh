@@ -15,7 +15,7 @@ PID_DIR="$DEV_DIR/pids"
 CONTENT_SYNC_SCRIPT="$HERE/scripts/content_sync_daemon.py"
 CONTENT_SYNC_MIRROR_ID="dev-content-sync"
 
-DASHBOARD_HINT="start it from the Dashboard repo: ../Dashboard/dev.sh up"
+DASHBOARD_HINT="start it from the Dashboard repo: ../Dashboard/dev.sh up (or, for Atlas, check MONGO_URI in .env and the cluster's IP access list)"
 
 log() { echo "dev.sh: $*"; }
 die() { echo "dev.sh: ERROR: $*" >&2; exit 1; }
@@ -38,18 +38,53 @@ load_env() {
     set +a
   fi
   MONGO_URI="${MONGO_URI:-mongodb://localhost:27017/ieee?directConnection=true}"
-  export MONGO_URI
+  # An Atlas SRV lookup + TLS handshake alone can take ~2s; local is instant.
+  if mongo_uri_is_local; then MONGO_TIMEOUT_MS=1500; else MONGO_TIMEOUT_MS=8000; fi
+  export MONGO_URI MONGO_TIMEOUT_MS
+}
+
+# -- local vs remote Mongo ------------------------------------------------------
+# MONGO_URI may hold credentials (e.g. an Atlas mongodb+srv:// URI), so it is
+# never printed -- only a label -- and the Python helpers below read it from
+# the environment rather than having it pasted into their source (and argv).
+
+mongo_uri_is_local() {
+  case "$MONGO_URI" in
+    mongodb://*) ;;
+    *) return 1 ;;
+  esac
+  local authority="${MONGO_URI#mongodb://}" host
+  authority="${authority%%[/?]*}"   # drop /db?options
+  authority="${authority##*@}"      # drop user:pass@
+  [ -n "$authority" ] || return 1
+  local IFS=,
+  for host in $authority; do
+    case "$host" in
+      localhost|localhost:*|127.0.0.1|127.0.0.1:*|"[::1]"|"[::1]:"*) ;;
+      *) return 1 ;;
+    esac
+  done
+}
+
+mongo_label() {
+  if mongo_uri_is_local; then
+    echo "local"
+  elif [[ "$MONGO_URI" == *.mongodb.net* ]]; then
+    echo "Atlas (remote)"
+  else
+    echo "remote"
+  fi
 }
 
 # -- helpers ------------------------------------------------------------------
 
 mongo_reachable() {
   "$HERE/.venv/bin/python" -c "
-import sys
+import os, sys
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 try:
-    MongoClient('$MONGO_URI', serverSelectionTimeoutMS=1500).admin.command('ping')
+    MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS'])).admin.command('ping')
 except PyMongoError:
     sys.exit(1)
 " 2>/dev/null
@@ -64,8 +99,9 @@ wait_for_mongo_truthy() {
   local expr="$1" tries="${2:-60}"
   for _ in $(seq 1 "$tries"); do
     [ "$("$HERE/.venv/bin/python" -c "
+import os
 from pymongo import MongoClient
-client = MongoClient('$MONGO_URI', serverSelectionTimeoutMS=2000)
+client = MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS']))
 db = client.get_default_database()
 print($expr)
 " 2>/dev/null)" = "True" ] && return 0
@@ -148,7 +184,7 @@ cmd_up() {
   start_content_sync
   echo
   echo "================================================================"
-  echo " Content sync is up -- Mongo: $MONGO_URI"
+  echo " Content sync is up -- Mongo: $(mongo_label)"
   echo " Stop:   ./dev.sh down"
   echo " Status: ./dev.sh status"
   echo " Logs:   ./dev.sh logs"
@@ -163,7 +199,7 @@ cmd_down() {
 
 cmd_status() {
   load_env
-  echo "Mongo ($MONGO_URI):"
+  echo "Mongo: $(mongo_label)"
   if mongo_reachable; then
     echo "  reachable"
   else
@@ -175,8 +211,9 @@ cmd_status() {
     echo "  up (pid $(cat "$PID_DIR/content-sync.pid"))"
     if mongo_reachable; then
       "$HERE/.venv/bin/python" -c "
+import os
 from pymongo import MongoClient
-client = MongoClient('$MONGO_URI', serverSelectionTimeoutMS=2000)
+client = MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS']))
 db = client.get_default_database()
 m = db.mirror_status.find_one({'mirror_id': '$CONTENT_SYNC_MIRROR_ID'})
 print('  last synced:', m['last_sync_at'] if m else 'never yet')
