@@ -10,6 +10,7 @@ just that Mongo URI and the contract version below.
 """
 
 import os
+import re
 from pathlib import Path
 
 # chapters first: the other collections' docs name their chapter when indexed.
@@ -50,6 +51,11 @@ class ContentSyncConfig:
     @property
     def enabled(self) -> bool:
         return bool(self.mongo_uri)
+
+    @property
+    def mongo_uri_redacted(self) -> str:
+        """mongo_uri without its user:password@ part -- the only form that's safe to log."""
+        return re.sub(r"(://)[^/?@]*@", r"\1", self.mongo_uri or "")
 
 
 def load_config() -> ContentSyncConfig:

@@ -43,7 +43,7 @@ async def main() -> None:
     content_sync = build_content_sync()
     logger.info(
         "starting (mirror_id=%s, mongo=%s, qdrant_collection=%s)",
-        content_sync.config.mirror_id, content_sync.config.mongo_uri, content_sync.config.qdrant_collection,
+        content_sync.config.mirror_id, content_sync.config.mongo_uri_redacted, content_sync.config.qdrant_collection,
     )
 
     stop_event = threading.Event()
