@@ -4,6 +4,12 @@ from smartmirror.hal import HAL
 from smartmirror.server import SmartMirrorServer
 
 
+def test_server_defaults_to_localhost_video_feed():
+    server = SmartMirrorServer(with_camera=False, with_frontend=False)
+
+    assert server.camera_id == "http://localhost:5000/video_feed"
+
+
 class FakeAssistant:
     """Stands in for Assistant: one voice turn through the hooks, then waits for the stop event."""
 
