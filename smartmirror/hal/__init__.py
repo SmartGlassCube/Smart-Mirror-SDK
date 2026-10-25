@@ -1,3 +1,3 @@
-from .hal import HAL
+from .hal import HAL, is_stream_url
 
-__all__ = ["HAL"]
+__all__ = ["HAL", "is_stream_url"]

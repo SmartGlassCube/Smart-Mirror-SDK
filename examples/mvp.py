@@ -6,6 +6,7 @@ from pathlib import Path
 from smartmirror.assistant import Assistant
 from smartmirror.assistant.llm import OpenAICompatBackend
 from smartmirror.core import StateManager
+from smartmirror.hal import HAL
 from smartmirror.server import SmartMirrorServer
 from smartmirror.widgets import (
     CalendarWidget,
@@ -34,6 +35,16 @@ except ImportError:
     pass
 
 
+def device_from_env(name):
+    """A camera/mic choice from .env: unset -> None (the default device), a
+    number -> that local device index, anything else as given -- e.g. an
+    http:// URL served by scripts/lan_media_server.py on another machine."""
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    return int(value) if value.isdigit() else value
+
+
 def build_assistant(content_sync=None):
     """Ollama-backed by default so this runs without a paid API key -- pull a
     model first (e.g. `ollama pull qwen2.5:0.5b`) and start `ollama serve`.
@@ -44,7 +55,10 @@ def build_assistant(content_sync=None):
     the assistant retrieves from the Mongo-derived Qdrant collection and
     gets the live events/announcements/mission prompt block instead of the
     placeholder seed corpus.
+
+    SMARTMIRROR_MIC picks the microphone (see device_from_env).
     """
+    hal = HAL(input_device=device_from_env("SMARTMIRROR_MIC"))
     backend = OpenAICompatBackend(
         api_key=os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama"),
         base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1"),
@@ -52,12 +66,12 @@ def build_assistant(content_sync=None):
     )
     if content_sync is not None:
         return Assistant(
-            llm=backend, stt=True, tts=True,
+            llm=backend, stt=True, tts=True, hal=hal,
             store=content_sync.indexer.store,
             extra_context=content_sync.prompt_block,
         )
     seed_corpus = Path(__file__).resolve().parent.parent / "smartmirror" / "assistant" / "rag" / "seed_corpus"
-    return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True)
+    return Assistant(llm=backend, documents=str(seed_corpus), stt=True, tts=True, hal=hal)
 
 
 def fallback_calendar_provider():
@@ -250,6 +264,8 @@ if __name__ == "__main__":
         state_manager=state_manager,
         with_frontend=True,
         with_camera=True,
+        # SMARTMIRROR_CAMERA picks the camera (see device_from_env); camera 0 by default.
+        camera_id=device_from_env("SMARTMIRROR_CAMERA") or 0,
         assistant=build_assistant(content_sync),
         content_sync=content_sync,
     )

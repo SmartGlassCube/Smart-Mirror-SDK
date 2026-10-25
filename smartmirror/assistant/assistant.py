@@ -29,6 +29,9 @@ DEFAULT_WAKE_WORD = "ABDOU"
 # turn (open-ended conversation, not a fixed 3-minute session) -- 0/None
 # disables the window entirely (always require the wake word).
 DEFAULT_WAKE_WINDOW_SECONDS = 180
+# Cap on listen_loop's pause between retries when voice turns keep failing
+# back to back (1s, 2s, 4s, ... up to this).
+FAILURE_BACKOFF_MAX_SECONDS = 30
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are the Smart Mirror voice assistant. Answer ONLY using facts "
@@ -193,6 +196,7 @@ class Assistant:
             self.hal = hal
 
         wake_window_deadline = None  # None = wake word required; monotonic timestamp = window open until then
+        consecutive_failures = 0
 
         while stop_event is None or not stop_event.is_set():
             if wake_window_deadline is not None and time.monotonic() >= wake_window_deadline:
@@ -220,12 +224,27 @@ class Assistant:
                 # PortAudio) kills the process below where Python can catch
                 # anything -- see the process-supervision note in
                 # scripts/voice_pipeline_manual_test.md.
-                logger.exception("Voice turn failed -- resuming wake-word listening")
+                #
+                # A failure that repeats every turn (no microphone, network
+                # mic unreachable) would otherwise spin this loop flat out:
+                # full traceback once, then one line per retry, backing off
+                # exponentially up to FAILURE_BACKOFF_MAX_SECONDS.
+                consecutive_failures += 1
+                delay = min(FAILURE_BACKOFF_MAX_SECONDS, 2 ** (consecutive_failures - 1))
+                if consecutive_failures == 1:
+                    logger.exception("Voice turn failed -- retrying in %ss", delay)
+                else:
+                    logger.warning("Voice turn failed again (%s in a row) -- retrying in %ss", consecutive_failures, delay)
                 if wake_window_deadline is not None:
                     logger.info("Wake window closed (turn failed), listening for %r again", self.wake_word_detector.wake_word)
                 wake_window_deadline = None
+                if stop_event is not None:
+                    await asyncio.to_thread(stop_event.wait, delay)
+                else:
+                    await asyncio.sleep(delay)
                 continue
 
+            consecutive_failures = 0
             if question is None:
                 # continued-mode capture hit the deadline with no speech --
                 # nothing happened this turn, let the top-of-loop check close

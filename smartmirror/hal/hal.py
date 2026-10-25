@@ -23,6 +23,13 @@ import numpy as np
 
 DEFAULT_SAMPLERATE = 16000
 DEFAULT_BLOCKSIZE = 1600  # 100ms at 16kHz
+# A network mic that sends nothing for this long counts as gone.
+NETWORK_AUDIO_TIMEOUT_SECONDS = 5
+
+
+def is_stream_url(device) -> bool:
+    """True for a camera/microphone given as an http(s):// URL rather than a local device."""
+    return isinstance(device, str) and device.startswith(("http://", "https://"))
 
 
 class HAL:
@@ -46,7 +53,15 @@ class HAL:
         self._closed.set()
 
     def read_audio(self):
-        """Yield mono int16 audio blocks at self.samplerate from the microphone, until close()."""
+        """Yield mono int16 audio blocks at self.samplerate from the microphone, until close().
+
+        An http:// `input_device` is a microphone on another machine instead:
+        a raw mono int16 stream, as served by scripts/lan_media_server.py.
+        """
+        if is_stream_url(self.input_device):
+            yield from self._read_network_audio()
+            return
+
         import sounddevice as sd
 
         device_rate = self._resolve_input_samplerate()
@@ -65,6 +80,23 @@ class HAL:
                 if device_rate != self.samplerate:
                     block = resample_int16(block, device_rate, self.samplerate)
                 yield block
+
+    def _read_network_audio(self):
+        """read_audio() for an http:// input_device. Raises once the stream drops, like a mic that's unplugged."""
+        from urllib.request import urlopen
+
+        separator = "&" if "?" in self.input_device else "?"
+        url = f"{self.input_device}{separator}rate={self.samplerate}"
+        block_bytes = self.blocksize * 2  # int16
+        with urlopen(url, timeout=NETWORK_AUDIO_TIMEOUT_SECONDS) as response:
+            while not self._closed.is_set():
+                data = b""
+                while len(data) < block_bytes:
+                    chunk = response.read(block_bytes - len(data))
+                    if not chunk:
+                        raise ConnectionError(f"network microphone stream ended: {self.input_device}")
+                    data += chunk
+                yield np.frombuffer(data, dtype="<i2").copy()
 
     def play_audio(self, samples: np.ndarray, samplerate: int) -> None:
         """Blocking playback of mono samples at `samplerate` through the speaker."""

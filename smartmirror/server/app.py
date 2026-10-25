@@ -11,7 +11,7 @@ from websockets.datastructures import Headers
 from websockets.http11 import Response
 
 from ..core import StateManager
-from ..hal import HAL
+from ..hal import HAL, is_stream_url
 from ..vision import GestureDetector
 from .camera_preview import CameraPreview
 from .frontend_launcher import FrontendLauncher
@@ -22,6 +22,12 @@ from .widget_data import refresh_widget_data
 # The events' uploaded images (content sync's local copies) are served over plain
 # HTTP on the WebSocket port, under this path.
 CONTENT_IMAGES_PATH = "/content-images"
+
+# A camera streamed over the LAN (camera_id is an http:// URL): how long to
+# wait on opening it or on a frame before treating it as down, and how often
+# to try again while it is.
+CAMERA_STREAM_TIMEOUT_MS = 5000
+CAMERA_STREAM_RETRY_SECONDS = 5
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +188,9 @@ class SmartMirrorServer:
         self.hub.broadcast({"type": "ASSISTANT_SAY", "text": text})
 
     async def _main_loop(self):
+        if self.with_camera and is_stream_url(self.camera_id):
+            return await self._network_camera_loop()
+
         capture = self._open_camera() if self.with_camera else None
         if capture is None:
             while self.running:
@@ -217,6 +226,72 @@ class SmartMirrorServer:
         capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         capture.set(cv2.CAP_PROP_FPS, 30)
+        return capture
+
+    async def _network_camera_loop(self):
+        """_main_loop for a camera streamed from another machine (camera_id is an http:// URL).
+
+        Unlike a local camera, the stream can be down at startup or drop
+        later, so this keeps retrying instead of settling into data-only
+        mode -- widgets stay live meanwhile. Opening and reading run in a
+        worker thread: a stalled stream blocks for up to the timeouts, and
+        must not freeze the event loop (WebSocket clients, widgets) with it.
+        """
+        if self.gesture_detector is None:
+            self.gesture_detector = GestureDetector()
+
+        capture = None
+        next_open_at = 0.0
+        last_frame_at = 0.0
+        last_widget_refresh = 0.0
+        waiting_logged = False
+        try:
+            while self.running:
+                now = time.time()
+                if capture is None and now >= next_open_at:
+                    capture = await asyncio.to_thread(self._open_network_camera)
+                    if capture is None:
+                        next_open_at = now + CAMERA_STREAM_RETRY_SECONDS
+                        if not waiting_logged:
+                            print(f"[Camera] Stream {self.camera_id} not reachable; retrying every {CAMERA_STREAM_RETRY_SECONDS}s")
+                            waiting_logged = True
+                    else:
+                        print(f"[Camera] Connected to stream {self.camera_id}")
+                        last_frame_at = time.time()
+                        waiting_logged = False
+
+                ok = False
+                if capture is not None:
+                    ok, frame = await asyncio.to_thread(capture.read)
+                    if ok:
+                        last_frame_at = time.time()
+                        await self._process_frame(frame)
+                    elif time.time() - last_frame_at > CAMERA_STREAM_TIMEOUT_MS / 1000:
+                        print(f"[Camera] Stream {self.camera_id} stopped sending frames; reconnecting")
+                        capture.release()
+                        capture = None
+                        next_open_at = 0.0
+
+                now = time.time()
+                if now - last_widget_refresh >= self.widget_update_tick:
+                    await self._refresh_widget_data()
+                    last_widget_refresh = now
+
+                await asyncio.sleep(0.01 if ok else 0.02)
+        finally:
+            if capture is not None:
+                capture.release()
+            self.gesture_detector.close()
+
+    def _open_network_camera(self):
+        capture = cv2.VideoCapture(
+            self.camera_id,
+            cv2.CAP_FFMPEG,
+            [cv2.CAP_PROP_OPEN_TIMEOUT_MSEC, CAMERA_STREAM_TIMEOUT_MS, cv2.CAP_PROP_READ_TIMEOUT_MSEC, CAMERA_STREAM_TIMEOUT_MS],
+        )
+        if not capture.isOpened():
+            capture.release()
+            return None
         return capture
 
     async def _process_frame(self, frame):
