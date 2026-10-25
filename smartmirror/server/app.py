@@ -114,9 +114,12 @@ class SmartMirrorServer:
             ):
                 if self.frontend is not None:
                     await self.frontend.start()
-                tasks = [self._main_loop(), self._widget_data_loop()]
+                tasks = [
+                    self._log_crash("Camera loop", self._main_loop()),
+                    self._log_crash("Widget data loop", self._widget_data_loop()),
+                ]
                 if self.with_camera:
-                    tasks.append(self._camera_watchdog_loop())
+                    tasks.append(self._log_crash("Camera watchdog", self._camera_watchdog_loop()))
                 if self.content_sync is not None:
                     tasks.append(self._content_sync_loop())
                 if getattr(self.assistant, "stt", None) is not None:
@@ -126,6 +129,13 @@ class SmartMirrorServer:
             self._stop_background_loops()
             if self.frontend is not None:
                 await self.frontend.stop()
+
+    async def _log_crash(self, name, loop):
+        """Run one of run()'s loops, logging a crash right away -- gather(return_exceptions=True) would hide it."""
+        try:
+            await loop
+        except Exception:
+            logger.exception("%s crashed", name)
 
     def _serve_content_image(self, connection, request):
         """GET /content-images/<file>: an event image. Any other request goes on to the WebSocket handshake."""
