@@ -53,3 +53,25 @@ def test_a_successful_turn_resets_the_backoff():
     asyncio.run(bare_assistant(hear).listen_loop(stop_event=stop))
 
     assert stop.waits == [1, 2, 1]
+
+
+def test_a_new_error_after_the_mic_recovers_waits_1s_and_logs_its_traceback(caplog):
+    outcomes = iter(["no mic", "no mic", "question"])
+
+    def hear(*_args):
+        if next(outcomes) == "no mic":
+            raise RuntimeError("Error querying device -1")
+        return "what's next?"
+
+    def answer(_question):
+        raise ConnectionError("LLM endpoint refused the connection")
+
+    assistant = bare_assistant(hear)
+    assistant._answer = answer
+    stop = RecordingStop(limit=3)
+    with caplog.at_level("WARNING", logger="smartmirror.assistant.assistant"):
+        asyncio.run(assistant.listen_loop(stop_event=stop))
+
+    assert stop.waits == [1, 2, 1]
+    tracebacks = [record.exc_info[1] for record in caplog.records if record.exc_info]
+    assert [str(error) for error in tracebacks] == ["Error querying device -1", "LLM endpoint refused the connection"]

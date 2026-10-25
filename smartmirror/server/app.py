@@ -28,6 +28,8 @@ CONTENT_IMAGES_PATH = "/content-images"
 # to try again while it is.
 CAMERA_STREAM_TIMEOUT_MS = 5000
 CAMERA_STREAM_RETRY_SECONDS = 5
+# How often the camera watchdog checks how many frames got processed.
+CAMERA_WATCHDOG_SECONDS = 10
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,9 @@ class SmartMirrorServer:
         self.widget_update_tick = widget_update_tick
         self.hub = ClientHub(state_manager)
         self.running = False
+        # For the camera watchdog: frames processed since its last check, and whether a camera is open.
+        self._frames_processed = 0
+        self._camera_open = False
 
     async def run(self):
         print(f"[Server] WebSocket server on ws://{self.ws_host}:{self.ws_port}")
@@ -109,7 +114,9 @@ class SmartMirrorServer:
             ):
                 if self.frontend is not None:
                     await self.frontend.start()
-                tasks = [self._main_loop()]
+                tasks = [self._main_loop(), self._widget_data_loop()]
+                if self.with_camera:
+                    tasks.append(self._camera_watchdog_loop())
                 if self.content_sync is not None:
                     tasks.append(self._content_sync_loop())
                 if getattr(self.assistant, "stt", None) is not None:
@@ -193,30 +200,52 @@ class SmartMirrorServer:
 
         capture = self._open_camera() if self.with_camera else None
         if capture is None:
-            while self.running:
-                await self._refresh_widget_data()
-                await asyncio.sleep(self.widget_update_tick)
-            return
+            return  # data-only mode: _widget_data_loop keeps the widgets live on its own
 
         if self.gesture_detector is None:
             self.gesture_detector = GestureDetector()
 
-        last_widget_refresh = 0.0
+        self._camera_open = True
         try:
             while self.running:
                 ok, frame = capture.read()
                 if ok:
                     await self._process_frame(frame)
-
-                now = time.time()
-                if now - last_widget_refresh >= self.widget_update_tick:
-                    await self._refresh_widget_data()
-                    last_widget_refresh = now
-
                 await asyncio.sleep(0.01 if ok else 0.02)
         finally:
+            self._camera_open = False
             capture.release()
             self.gesture_detector.close()
+
+    async def _widget_data_loop(self):
+        """Keeps widget data fresh on its own schedule, so a slow or stalled camera can't hold it back."""
+        while self.running:
+            await self._refresh_widget_data()
+            await asyncio.sleep(self.widget_update_tick)
+
+    async def _camera_watchdog_loop(self):
+        """Prints the processed frame rate when it changes state: first frames, a stall, and recovery.
+
+        A stall is the camera being open with no frame processed for
+        CAMERA_WATCHDOG_SECONDS -- e.g. a LAN stream that hangs without
+        dropping, which the camera loops themselves can't see.
+        """
+        flowing = None  # unknown until a window with the camera open
+        window_start = time.time()
+        while self.running:
+            await asyncio.sleep(0.5)
+            if time.time() - window_start < CAMERA_WATCHDOG_SECONDS:
+                continue
+            window_start = time.time()
+            frames, self._frames_processed = self._frames_processed, 0
+            if not self._camera_open:
+                flowing = None
+                continue
+            if frames and flowing is not True:
+                print(f"[Camera] Processing {frames / CAMERA_WATCHDOG_SECONDS:.0f} frames/s")
+            elif not frames and flowing is not False:
+                print(f"[Camera] Camera open, but no frame processed in the last {CAMERA_WATCHDOG_SECONDS}s")
+            flowing = bool(frames)
 
     def _open_camera(self):
         capture = cv2.VideoCapture(self.camera_id)
@@ -233,9 +262,9 @@ class SmartMirrorServer:
 
         Unlike a local camera, the stream can be down at startup or drop
         later, so this keeps retrying instead of settling into data-only
-        mode -- widgets stay live meanwhile. Opening and reading run in a
-        worker thread: a stalled stream blocks for up to the timeouts, and
-        must not freeze the event loop (WebSocket clients, widgets) with it.
+        mode. Opening and reading run in a worker thread: a stalled stream
+        blocks for up to the timeouts, and must not freeze the event loop
+        (WebSocket clients, widgets) with it.
         """
         if self.gesture_detector is None:
             self.gesture_detector = GestureDetector()
@@ -243,7 +272,6 @@ class SmartMirrorServer:
         capture = None
         next_open_at = 0.0
         last_frame_at = 0.0
-        last_widget_refresh = 0.0
         waiting_logged = False
         try:
             while self.running:
@@ -257,6 +285,7 @@ class SmartMirrorServer:
                             waiting_logged = True
                     else:
                         print(f"[Camera] Connected to stream {self.camera_id}")
+                        self._camera_open = True
                         last_frame_at = time.time()
                         waiting_logged = False
 
@@ -268,17 +297,14 @@ class SmartMirrorServer:
                         await self._process_frame(frame)
                     elif time.time() - last_frame_at > CAMERA_STREAM_TIMEOUT_MS / 1000:
                         print(f"[Camera] Stream {self.camera_id} stopped sending frames; reconnecting")
+                        self._camera_open = False
                         capture.release()
                         capture = None
                         next_open_at = 0.0
 
-                now = time.time()
-                if now - last_widget_refresh >= self.widget_update_tick:
-                    await self._refresh_widget_data()
-                    last_widget_refresh = now
-
                 await asyncio.sleep(0.01 if ok else 0.02)
         finally:
+            self._camera_open = False
             if capture is not None:
                 capture.release()
             self.gesture_detector.close()
@@ -295,6 +321,7 @@ class SmartMirrorServer:
         return capture
 
     async def _process_frame(self, frame):
+        self._frames_processed += 1
         frame = cv2.flip(frame, 1)  # mirror, so the user's left is screen-left
         # The debug window draws on `frame` in place; keep the preview's copy clean.
         clean_frame = frame.copy() if self.gesture_detector.debug else frame

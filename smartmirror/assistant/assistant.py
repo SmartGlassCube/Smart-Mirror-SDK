@@ -197,6 +197,7 @@ class Assistant:
 
         wake_window_deadline = None  # None = wake word required; monotonic timestamp = window open until then
         consecutive_failures = 0
+        last_failure = None  # "Type: message" of the latest failed turn, while failures keep coming
 
         while stop_event is None or not stop_event.is_set():
             if wake_window_deadline is not None and time.monotonic() >= wake_window_deadline:
@@ -207,6 +208,7 @@ class Assistant:
 
             try:
                 question = await asyncio.to_thread(self._hear_question, require_wake_word, wake_window_deadline)
+                consecutive_failures = 0  # the mic works again; a later failure is a new problem
                 if stop_event is not None and stop_event.is_set():
                     return
                 answer = None
@@ -216,7 +218,7 @@ class Assistant:
                         answer = await asyncio.to_thread(self._answer, question)
                         await _call(on_answer, answer)
                         await asyncio.to_thread(self.tts.speak, answer)
-            except Exception:
+            except Exception as error:
                 # A bad turn (LLM hiccup, transient STT/TTS error, ...) must
                 # not take the whole loop down -- log it and keep listening.
                 # Note this only catches ordinary Python exceptions; a
@@ -227,14 +229,16 @@ class Assistant:
                 #
                 # A failure that repeats every turn (no microphone, network
                 # mic unreachable) would otherwise spin this loop flat out:
-                # full traceback once, then one line per retry, backing off
-                # exponentially up to FAILURE_BACKOFF_MAX_SECONDS.
+                # back off exponentially up to FAILURE_BACKOFF_MAX_SECONDS,
+                # with the full traceback only for an error not just seen.
                 consecutive_failures += 1
                 delay = min(FAILURE_BACKOFF_MAX_SECONDS, 2 ** (consecutive_failures - 1))
-                if consecutive_failures == 1:
+                failure = f"{type(error).__name__}: {error}"
+                if failure != last_failure:
                     logger.exception("Voice turn failed -- retrying in %ss", delay)
                 else:
-                    logger.warning("Voice turn failed again (%s in a row) -- retrying in %ss", consecutive_failures, delay)
+                    logger.warning("Voice turn failed again (%s in a row, %s) -- retrying in %ss", consecutive_failures, failure, delay)
+                last_failure = failure
                 if wake_window_deadline is not None:
                     logger.info("Wake window closed (turn failed), listening for %r again", self.wake_word_detector.wake_word)
                 wake_window_deadline = None
@@ -244,7 +248,7 @@ class Assistant:
                     await asyncio.sleep(delay)
                 continue
 
-            consecutive_failures = 0
+            last_failure = None
             if question is None:
                 # continued-mode capture hit the deadline with no speech --
                 # nothing happened this turn, let the top-of-loop check close
