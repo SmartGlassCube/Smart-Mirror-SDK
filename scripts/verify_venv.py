@@ -13,7 +13,9 @@ from a fresh download; exits 1 if any are found.
 import base64
 import hashlib
 import sys
+import warnings
 from importlib.metadata import distributions
+from pathlib import Path
 
 
 def file_hash(path):
@@ -24,6 +26,15 @@ def file_hash(path):
     return base64.urlsafe_b64encode(digest.digest()).rstrip(b"=").decode()
 
 
+def package_name(dist):
+    """The package's name -- from its folder when METADATA itself is damaged or missing."""
+    name = dist.metadata["Name"] if dist.metadata is not None else None
+    if name:
+        return name
+    folder = Path(str(getattr(dist, "_path", "unknown-package")))
+    return folder.name.split("-")[0]
+
+
 def hashed_entries(dist):
     for entry in dist.files or []:
         if entry.hash is not None and entry.hash.mode == "sha256":  # skips RECORD itself, .pyc files
@@ -32,7 +43,13 @@ def hashed_entries(dist):
 
 def main():
     print(f"Checking the packages in {sys.prefix} (can take a few minutes on an SD card)...")
-    dists = sorted(distributions(), key=lambda d: d.metadata["Name"].lower())
+    warnings.simplefilter("ignore", DeprecationWarning)  # importlib's noise about a missing Name
+    dists = sorted(distributions(), key=lambda d: package_name(d).lower())
+
+    damaged = {}
+    for dist in dists:
+        if not (dist.metadata is not None and dist.metadata["Name"]):
+            damaged.setdefault(package_name(dist), []).append(f"{getattr(dist, '_path', '?')}/METADATA (missing or empty)")
 
     # Some packages ship the same files (opencv-python and opencv-contrib-python
     # both install cv2/): whichever was installed last wins, so a file is fine
@@ -43,7 +60,6 @@ def main():
             expected.setdefault(entry.locate(), set()).add(entry.hash.value)
 
     actual = {}
-    damaged = {}
     for dist in dists:
         for entry in hashed_entries(dist):
             path = entry.locate()
@@ -53,7 +69,7 @@ def main():
                 except FileNotFoundError:
                     actual[path] = None
             if actual[path] not in expected[path]:
-                damaged.setdefault(dist.metadata["Name"], []).append(str(entry) + (" (missing)" if actual[path] is None else ""))
+                damaged.setdefault(package_name(dist), []).append(str(entry) + (" (missing)" if actual[path] is None else ""))
 
     if not damaged:
         print("All installed packages match their recorded hashes.")
