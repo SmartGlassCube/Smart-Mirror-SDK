@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { BackendMessage } from '../types/mirror'
 
-// VITE_SMARTMIRROR_WS_PORT is set by the Python FrontendLauncher from SmartMirrorServer(ws_port=...).
+// VITE_SMARTMIRROR_WS_PORT is set when the backend app starts this dev server (backend/smartmirror/app/frontend_dev.py).
 const WS_PORT = import.meta.env.VITE_SMARTMIRROR_WS_PORT ?? '8080'
 const WS_URL = `ws://${window.location.hostname || 'localhost'}:${WS_PORT}`
 const RECONNECT_DELAY_MS = 2000

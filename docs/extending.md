@@ -1,6 +1,6 @@
 # Extending the Smart Mirror SDK
 
-Everything below plugs in from your own app code. None of it requires editing files inside `smartmirror/`.
+Everything below plugs in from your own app code. None of it requires editing the SDK packages in `backend/smartmirror/`. The mirror app's own pages are in `backend/smartmirror/app/pages.py`: a good place to start.
 
 | You want to add… | Python | Frontend |
 |---|---|---|
@@ -48,14 +48,14 @@ server = SmartMirrorServer(state_manager=state_manager, gesture_detector=detecto
 
 **Inputs available in `context`:**
 - `context.hands["left" | "right"]`: `HandData`, which has `landmarks` (21 × `(x, y, z)`), `palm_center`, `bbox`, `is_raised` and `detected`.
-- `context.signals`: shared per-frame features, computed once. The full table is in [`docs/vision/README.md`](vision/README.md#signals).
+- `context.signals`: shared per-frame features, computed once. The full table is in [vision.md](vision.md#signals).
 - `context.timestamp`: the frame time in seconds.
 
 **Base classes for common gesture shapes** (in `smartmirror.vision`):
 - `ContinuousGesture`: for start → update → end gestures. Call `self._phase(side, triggered, ended, (start, update, end), location, data)` once per hand per frame. `ScrollGesture` and `ZoomGesture` use it.
 - `PostureSwipeGesture`: a one-hand swipe while holding a posture. Implement `is_ready(context, side)` and `tracked_point(context, side)`, and set `directions = {"left": ..., "right": ..., "up": ..., "down": ...}`. `SwipeGesture` and `TwoFingersSwipeGesture` are about 20 lines each on top of it.
 
-Try a new gesture with `examples/gesture_detector_debug.py`: add it to the list and watch the event feed.
+Try a new gesture with `backend/examples/gesture_detector_debug.py`: add it to the list and watch the event feed.
 
 ---
 

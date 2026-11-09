@@ -1,24 +1,32 @@
 #!/usr/bin/env bash
 # This repo's dev stack: the content-sync daemon (Mongo -> RAG + widget
-# cache) and the mirror app. MongoDB itself, the dashboard, and the data
-# contract are owned by the Dashboard repo (../Dashboard) -- this repo
-# depends on it only through MONGO_URI. See `./dev.sh help`.
+# cache) and the mirror app (backend/ + frontend/). MongoDB itself, the
+# dashboard, and the data contract are owned by the Dashboard repo
+# (../Dashboard) -- this repo depends on it only through MONGO_URI.
+# See `./dev.sh help`.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ENV_FILE="$HERE/.env"
-ENV_EXAMPLE="$HERE/.env.example"
+BACKEND="$HERE/backend"
+ENV_FILE="$BACKEND/.env"
+ENV_EXAMPLE="$BACKEND/.env.example"
 DEV_DIR="$HERE/.dev"
 LOG_DIR="$DEV_DIR/logs"
 PID_DIR="$DEV_DIR/pids"
 
-CONTENT_SYNC_SCRIPT="$HERE/scripts/content_sync_daemon.py"
+# backend/.venv's python: bin/ on Linux/macOS (the Pi), Scripts/ under Git Bash on Windows.
+venv_python() {
+  if [ -x "$BACKEND/.venv/bin/python" ]; then echo "$BACKEND/.venv/bin/python"; else echo "$BACKEND/.venv/Scripts/python.exe"; fi
+}
+PYTHON="$(venv_python)"
+
+CONTENT_SYNC_SCRIPT="$BACKEND/scripts/content_sync_daemon.py"
 CONTENT_SYNC_MIRROR_ID="dev-content-sync"
 
 # Shown when Mongo can't be reached. A local Mongo is the one the Dashboard
 # repo's ./dev.sh up starts on this machine; Atlas needs nothing started here.
 local_mongo_hint() { echo "start it from the Dashboard repo on this machine: ../Dashboard/dev.sh up"; }
-atlas_hint() { echo "check MONGO_URI in this repo's .env, and that this machine's public IP is in the Atlas cluster's IP access list"; }
+atlas_hint() { echo "check MONGO_URI in backend/.env, and that this machine's public IP is in the Atlas cluster's IP access list"; }
 
 log() { echo "dev.sh: $*"; }
 die() { echo "dev.sh: ERROR: $*" >&2; exit 1; }
@@ -83,8 +91,8 @@ mongo_label() {
 
 # Prints why Mongo can't be reached -- credentials stripped -- or nothing if it can.
 mongo_ping_error() {
-  [ -x "$HERE/.venv/bin/python" ] || { echo ".venv is missing (run ./dev.sh up once to create it)"; return; }
-  "$HERE/.venv/bin/python" -c "
+  [ -x "$PYTHON" ] || { echo "backend/.venv is missing (run ./dev.sh up once to create it)"; return; }
+  "$PYTHON" -c "
 import os, re
 try:
     from pymongo import MongoClient
@@ -111,7 +119,7 @@ wait_for_mongo_truthy() {
   # wait_for_mongo_truthy <python-expr-returning-bool> [tries]
   local expr="$1" tries="${2:-60}"
   for _ in $(seq 1 "$tries"); do
-    [ "$("$HERE/.venv/bin/python" -c "
+    [ "$("$PYTHON" -c "
 import os
 from pymongo import MongoClient
 client = MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS']))
@@ -123,10 +131,11 @@ print($expr)
   return 1
 }
 
-ensure_root_venv_extras() {
-  if ! "$HERE/.venv/bin/python" -c "import pymongo, qdrant_client, sentence_transformers" >/dev/null 2>&1; then
+ensure_backend_venv() {
+  if ! "$PYTHON" -c "import pymongo, qdrant_client, sentence_transformers" >/dev/null 2>&1; then
     log "first run, installing data+assistant extras (pulls in torch -- can take a few minutes)..."
-    (cd "$HERE" && uv sync --extra data --extra assistant)
+    (cd "$BACKEND" && uv sync --extra data --extra assistant)
+    PYTHON="$(venv_python)"
   fi
 }
 
@@ -172,13 +181,13 @@ start_content_sync() {
     log "content-sync: already running (pid $(cat "$PID_DIR/content-sync.pid"))"
     return 0
   fi
-  ensure_root_venv_extras
+  ensure_backend_venv
   require_mongo
   mkdir -p "$LOG_DIR" "$PID_DIR"
   (
-    cd "$HERE"
+    cd "$BACKEND"
     SMARTMIRROR_MIRROR_ID="$CONTENT_SYNC_MIRROR_ID" \
-      nohup "$HERE/.venv/bin/python" "$CONTENT_SYNC_SCRIPT" \
+      nohup "$PYTHON" "$CONTENT_SYNC_SCRIPT" \
       >>"$LOG_DIR/content-sync.log" 2>&1 &
     echo $! >"$PID_DIR/content-sync.pid"
   )
@@ -226,7 +235,7 @@ cmd_status() {
   if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
     echo "  up (pid $(cat "$PID_DIR/content-sync.pid"))"
     if [ -z "$reason" ]; then
-      "$HERE/.venv/bin/python" -c "
+      "$PYTHON" -c "
 import os
 from pymongo import MongoClient
 client = MongoClient(os.environ['MONGO_URI'], serverSelectionTimeoutMS=int(os.environ['MONGO_TIMEOUT_MS']))
@@ -241,8 +250,8 @@ print('  last error: ', m.get('last_error') if m else None)
   fi
   echo
   local mirror_pid
-  mirror_pid="$(pgrep -f 'python.*examples/mvp\.py' | head -1 || true)"
-  echo "Mirror app (examples/mvp.py):"
+  mirror_pid="$(pgrep -f 'python.* -m smartmirror' | head -1 || true)"
+  echo "Mirror app (python -m smartmirror):"
   if [ -n "$mirror_pid" ]; then
     echo "  up (pid $mirror_pid)"
   else
@@ -257,17 +266,17 @@ cmd_logs() {
 
 cmd_mirror() {
   load_env
-  ensure_root_venv_extras
+  ensure_backend_venv
   require_mongo
-  # examples/mvp.py does its own full Mongo<->Qdrant sync; it can't share
+  # The mirror app does its own full Mongo<->Qdrant sync; it can't share
   # Qdrant's embedded storage lock with the standalone content-sync daemon
   # at the same time, so stop that first (`up` brings it back later).
   if find_pid "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" >/dev/null; then
     log "stopping the content-sync daemon first (the mirror app does its own syncing; they can't both hold Qdrant's storage lock)"
     stop_proc "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" "content-sync"
   fi
-  cd "$HERE"
-  exec uv run python examples/mvp.py
+  cd "$BACKEND"
+  exec uv run python -m smartmirror
 }
 
 cmd_help() {
@@ -280,14 +289,15 @@ Usage: ./dev.sh <command>
   down      Stop it.
   status    Mongo reachable? + content-sync up/last-sync + mirror app up?
   logs      Tail the content-sync daemon's log.
-  mirror    Run the full camera-driven mirror app (examples/mvp.py) with
-            MONGO_URI from .env. Stops the content-sync daemon first (see
+  mirror    Run the full camera-driven mirror app (python -m smartmirror,
+            frontend included) with MONGO_URI from backend/.env. Stops the
+            content-sync daemon first (see
             note below); `up` brings it back afterward.
   help      This.
 
 MongoDB itself, the dashboard, and infra/mongo/CONTRACT.md are owned by
 the Dashboard repo: https://github.com/SmartGlassCube/Dashboard
-Point this repo's .env (MONGO_URI) at whatever Mongo its ./dev.sh up
+Point backend/.env (MONGO_URI) at whatever Mongo its ./dev.sh up
 started, and run that repo's own ./dev.sh up first.
 
 The content-sync daemon and the mirror app can't run at the same time

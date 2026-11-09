@@ -1,63 +1,50 @@
 # Smart-Mirror-SDK
 
-A local-first Python SDK for gesture-controlled smart mirrors: webcam → hand gestures → pages and widgets → React UI over WebSocket.
+A local-first SDK for gesture-controlled smart mirrors: webcam → hand gestures → pages and widgets → React UI over WebSocket, plus a voice assistant.
 
-## The dashboard lives in a separate repo
+| Folder | What | Stack |
+|---|---|---|
+| [`backend/`](backend/README.md) | The `smartmirror` Python package (vision, state, widgets, assistant, content sync, server) and the mirror app | Python, uv |
+| [`frontend/`](frontend/README.md) | The mirror's UI | React, TypeScript, Vite |
+| [`docs/`](docs/) | [Architecture](docs/architecture.md), [backend ↔ frontend protocol](docs/protocol.md), [extending](docs/extending.md), [vision](docs/vision.md), [voice testing](docs/voice-pipeline-testing.md) | |
 
-Content management (events, announcements, about, achievements, board) and
-MongoDB itself are owned by [`Dashboard`](https://github.com/SmartGlassCube/Dashboard) --
-a separate repo, on purpose: the two depend on each other only through
-MongoDB + [`infra/mongo/CONTRACT.md`](https://github.com/SmartGlassCube/Dashboard/blob/main/infra/mongo/CONTRACT.md)
-in that repo, no shared code. Start that repo's `./dev.sh up` first, then
-come back here.
+The two halves share no code: they talk only over the WebSocket described in [docs/protocol.md](docs/protocol.md).
 
-## Dev quickstart (content sync + mirror)
+## Quickstart (mirror only, no Mongo)
+
+Needs [uv](https://docs.astral.sh/uv/), Node/npm and a webcam.
 
 ```bash
-git clone <this repo> && cd Smart-Mirror-SDK
-# ../Dashboard/dev.sh up must already be running -- see above
-./dev.sh up                  # starts the content-sync daemon (Mongo -> RAG + widget cache)
-./dev.sh mirror               # the full camera-driven mirror app (stops the daemon first, see below)
-./dev.sh down                 # stop the content-sync daemon
+cd backend
+uv sync --extra data --extra assistant   # first time: creates backend/.venv (pulls in torch)
+uv run python -m smartmirror             # backend on :8080, also starts the frontend on :5173
 ```
 
-No manual Mongo/mongosh setup here -- `./dev.sh up` is idempotent, safe to
-re-run from any state. First run installs the `data`/`assistant` extras
-(torch included, can take a few minutes) the content-sync daemon needs.
+Tests: `cd backend && uv run pytest`. Settings: copy `backend/.env.example` to `backend/.env`.
+
+## Club content (Dashboard + Mongo)
+
+Content management (events, announcements, about, achievements, board) and MongoDB
+itself are owned by the separate [`Dashboard`](https://github.com/SmartGlassCube/Dashboard) repo.
+The two repos depend on each other only through MongoDB and
+[`infra/mongo/CONTRACT.md`](https://github.com/SmartGlassCube/Dashboard/blob/main/infra/mongo/CONTRACT.md).
+Start that repo's `./dev.sh up` first, then:
 
 | Command | What it does |
 |---|---|
-| `./dev.sh up` | Start the content-sync daemon (Mongo -> assistant RAG + mirror's cached widget data). Needs Mongo reachable -- see `./dev.sh status`. |
+| `./dev.sh up` | Start the content-sync daemon (Mongo → assistant RAG + cached widget data). Installs the backend extras on first run. |
 | `./dev.sh down` | Stop it. |
-| `./dev.sh status` | Mongo reachable? + content-sync up/last-sync + mirror app up? |
+| `./dev.sh status` | Mongo reachable? Content sync up / last sync? Mirror app up? |
 | `./dev.sh logs` | Tail the content-sync daemon's log. |
-| `./dev.sh mirror` | Run the full camera-driven `examples/mvp.py` with `MONGO_URI` from `.env`. Stops the content-sync daemon first (Qdrant's local storage can't be held by both at once) -- `up` restarts it afterward. |
+| `./dev.sh mirror` | Run the full mirror app with `MONGO_URI` from `backend/.env`. Stops the content-sync daemon first: Qdrant's local storage can't be held by both. |
 
-See [OVERNIGHT_REPORT.md](OVERNIGHT_REPORT.md) and [WORK_REPORT.md](WORK_REPORT.md)
-for how this (and the split from the Dashboard repo) was built and verified.
+`./dev.sh up` is idempotent, safe to re-run from any state.
 
-## How to start developing (mirror only, no Mongo/dashboard)
+## Camera and mic on another machine
 
-From the repo root:
+For a mirror (e.g. a Raspberry Pi) without its own camera or microphone, run
+`uv run python scripts/lan_media_server.py --allow <mirror-ip>` in `backend/` on a machine
+that has them, and point the mirror's `SMARTMIRROR_CAMERA` / `SMARTMIRROR_MIC` at it
+(see `backend/.env.example`).
 
-```bash
-uv venv .venv
-source .venv/bin/activate          # Windows (Git Bash): source .venv/Scripts/activate
-uv pip install -e ".[assistant,data,dev]"
-python examples/mvp.py             # needs a webcam and Node/npm for the UI
-python -m pytest                   # unit tests, no camera needed
-```
-
-`uv run pytest` works out of the box (pytest is a default `uv sync` dependency
-group, not an opt-in extra) but the assistant/content test suites need the
-heavier `data`/`assistant` extras installed once: `uv sync --extra data --extra assistant`.
-After that, plain `uv run pytest ...` keeps using them (`uv sync` on its own
-re-trims back to just the defaults -- that's the one command to avoid).
-
-`smartmirror/content/tests` need a **running Mongo** -- they read `MONGO_URI`
-from the environment and skip with a clear message (pointing at
-`../Dashboard/dev.sh up`) if it's not reachable, rather than failing.
-
-- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md): architecture and module tour
-- [docs/extending.md](docs/extending.md): add your own gestures, widgets and pages
-- [docs/vision/README.md](docs/vision/README.md): the gesture pipeline and signals
+Past work logs: [docs/history/](docs/history/).
