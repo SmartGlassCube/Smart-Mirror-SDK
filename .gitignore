@@ -1,13 +1,18 @@
-.venv
+# Python
+.venv/
 __pycache__/
 *.pyc
-*.task
-*.egg-info
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 
+# Secrets (copy backend/.env.example to backend/.env)
 .env
-.qdrant_data/
-mvp_supervisor.log
 
-smartmirror/content/.cache/
+# Runtime files: hand-tracking model, Qdrant store, content cache (see smartmirror/config/paths.py)
+backend/.data/
+backend/mirror_supervisor.log
 
+# ./dev.sh logs + pids
 .dev/

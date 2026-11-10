@@ -1,6 +1,7 @@
 import './mirror.css'
 import { useCallback, useRef, useState } from 'react'
 import Abdo, { type AbdoHandle } from '../assistant/Abdo'
+import { publishPointer } from '../services/pointer'
 import { useWebSocket } from '../services/useWebSocket'
 import type { BackendMessage, CameraFrame, MirrorState } from '../types/mirror'
 import CameraPreview from './CameraPreview'
@@ -29,6 +30,7 @@ function MirrorCanvas() {
       setCameraFrame(message)
     } else if (message.type === 'POINTER') {
       cursorRef.current?.move(message.position)
+      publishPointer({ position: message.position, pinching: Boolean(message.pinching) })
     } else if (message.type === 'ASSISTANT_HEARD') {
       heardCount.current += 1
       setHeard({ id: heardCount.current, text: message.text })
