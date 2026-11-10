@@ -13,13 +13,13 @@ def drawing_page(widget):
     return StateManager(graph={"nodes": [{"id": "draw", "widgets": [widget]}], "edges": []})
 
 
-def test_clicks_change_the_brush_and_swipe_up_clears():
-    drawing = DrawingWidget(colors=["red", "blue"], sizes=[1, 3])
+def test_gestures_change_the_brush_and_swipe_up_clears():
+    drawing = DrawingWidget(colors=["red", "blue"], sizes=[1, 3, 5])
     state = drawing_page(drawing)
     assert drawing.data == {"color": "red", "size": 1, "clears": 0}
 
     assert state.handle_gesture_events([event("left_click")], timestamp=0)
-    assert state.handle_gesture_events([event("right_click")], timestamp=1)
+    assert state.handle_gesture_events([event("swipe_left")], timestamp=1)  # hand toward screen-right: bigger
     assert state.handle_gesture_events([event("swipe_up")], timestamp=2)
     assert drawing.data == {"color": "blue", "size": 3, "clears": 1}
     assert state.get_state_snapshot()["widgets"][0]["data"] == drawing.data
@@ -28,6 +28,19 @@ def test_clicks_change_the_brush_and_swipe_up_clears():
     assert drawing.data["color"] == "red"  # wraps around
     assert state.handle_gesture_events([event("two_fingers_swipe_up")], timestamp=4)
     assert drawing.data["clears"] == 2  # the page-change pose clears too
+
+
+def test_brush_size_stops_at_both_ends():
+    drawing = DrawingWidget(sizes=[1, 3])
+    state = drawing_page(drawing)
+
+    assert not state.handle_gesture_events([event("swipe_right")], timestamp=0)  # already the smallest
+    assert state.handle_gesture_events([event("swipe_left")], timestamp=1)
+    assert not state.handle_gesture_events([event("swipe_left")], timestamp=2)  # already the biggest
+    assert drawing.data["size"] == 3
+    assert state.handle_gesture_events([event("swipe_right")], timestamp=3)
+    assert drawing.data["size"] == 1
+    assert not drawing.handle_gesture(event("right_click"))  # no longer a drawing gesture
 
 
 def test_pinching_draws_instead_of_dragging_the_canvas():

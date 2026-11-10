@@ -32,13 +32,20 @@
   color: var(--px-black);
 }
 
-/* cqw/cqh = the page (see .mirror-page). The height leaves room for the status line above and
-   Abdo below, both in --u: the whole canvas stays in reach on the portrait mirror and in a
-   1920x1080 window alike. */
+/* The widget sits in the top-left corner (pages.py) and the canvas fills the rest of the page
+   (cqw/cqh, see .mirror-page), keeping clear of, in --u:
+   - width: the page margin (12) on the left; the camera preview (12 + 160) plus a gap (12) on
+     the right; the panel's padding and border (32).
+   - height: the top margin (40, see .widget-slot); the panel's title row, padding and border
+     (76); Abdo (300 + 4) and a gap (10) at the bottom.
+   Works the same on the portrait mirror and in a 1920x1080 window. */
 .drawing-canvas {
   display: block;
-  width: 76cqw;
-  height: max(30cqh, calc(100cqh - var(--u) * 600));
+  width: max(40cqw, calc(100cqw - var(--u) * 228));
+  height: max(30cqh, calc(100cqh - var(--u) * 430));
   background: rgba(0, 0, 0, 0.45);
   image-rendering: pixelated;
+  /* Not a layout gap: DrawingWidget reads it back as the size of one canvas pixel, so strokes
+     are drawn on the same 8-bit grid as the rest of the UI (--px). */
+  column-gap: var(--px);
 }

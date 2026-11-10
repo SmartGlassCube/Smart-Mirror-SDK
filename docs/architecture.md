@@ -244,7 +244,7 @@ Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` 
 | `GamesWidget` | `games` | Tiles for computer-vision games: `GamesWidget(games=[{id, title, icon}])`, `icon` an optional image URL |
 | `EventsWidget` | `events` | Cards for club events/projects: `EventsWidget(items=[{id, name, description, image}])`, or a `data_provider` returning `{"items": [...]}` |
 | `WeatherWidget` | `weather` | Current weather with a pixel icon; use `data_provider=OpenMeteoWeatherProvider(...)` |
-| `DrawingWidget` | `drawing` | Canvas drawn on by pinching; the frontend draws from `POINTER` messages. `left_click`/`right_click` change colour/size, `swipe_up` or `two_fingers_swipe_up` clears. `data = {color, size, clears}` |
+| `DrawingWidget` | `drawing` | Canvas drawn on by pinching; the frontend draws from `POINTER` messages. `left_click` changes colour, open-hand `swipe_left`/`swipe_right` (hand toward screen-right/left) make the brush bigger/smaller, `swipe_up` or `two_fingers_swipe_up` clears. `data = {color, size, clears}` |
 | `NewsWidget` | `news` | Announcements/achievements (`data = {"items": [...]}`) or placeholder `content` |
 
 ### 6.2 Data providers (`smartmirror/widgets/providers`)

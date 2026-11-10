@@ -8,9 +8,6 @@ import './drawing.css'
 type DrawingData = { color?: string; size?: number; clears?: number }
 type Point = { x: number; y: number }
 
-// The canvas is this many chunky pixels tall (its width follows its aspect ratio), scaled up
-// with crisp edges: strokes look like the rest of the 8-bit UI.
-const ROWS = 180
 // Share of the remaining distance the pen covers per animation frame, like HandCursor's.
 const SMOOTHING = 0.35
 // Tracking drops a frame now and then: a stroke survives losing the hand for this long.
@@ -48,8 +45,11 @@ const DrawingWidget = ({ widget }: WidgetProps<DrawingData>) => {
     if (!canvas || !ctx) {
       return
     }
-    const rows = ROWS
-    const cols = Math.max(1, Math.round((ROWS * canvas.clientWidth) / Math.max(1, canvas.clientHeight)))
+    // One canvas pixel per grid pixel of the UI (--px, handed over as the canvas's column-gap in
+    // drawing.css), scaled up with crisp edges: strokes look like the rest of the 8-bit UI.
+    const gridPixel = parseFloat(getComputedStyle(canvas).columnGap) || 4
+    const cols = Math.max(1, Math.round(canvas.clientWidth / gridPixel))
+    const rows = Math.max(1, Math.round(canvas.clientHeight / gridPixel))
     canvas.width = cols
     canvas.height = rows
     const saved = savedDrawings.get(widget.id)
@@ -153,7 +153,7 @@ const DrawingWidget = ({ widget }: WidgetProps<DrawingData>) => {
           </span>
           <span>pinch: draw</span>
           <span>fold index: colour</span>
-          <span>fold middle: size</span>
+          <span>open hand right / left: size</span>
           <span>swipe up: clear</span>
         </span>
       </h2>

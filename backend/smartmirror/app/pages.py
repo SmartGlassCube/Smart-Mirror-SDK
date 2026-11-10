@@ -156,7 +156,9 @@ def games_widgets():
 
 def draw_widgets():
     # The only widget on its page: a pinch anywhere draws instead of grabbing another widget.
-    return [DrawingWidget(position={"x": 0.5, "y": 0.44})]
+    # (0, 0): the frontend keeps widgets on screen, so this pins it to the top-left corner,
+    # and the canvas sizes itself to fill the room left by the camera preview and Abdo.
+    return [DrawingWidget(position={"x": 0, "y": 0})]
 
 
 def events_widgets(content_sync):
