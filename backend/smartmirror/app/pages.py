@@ -1,7 +1,8 @@
-"""The mirror's pages and their widgets: games <-> home <-> events."""
+"""The mirror's pages and their widgets: draw <-> games <-> home <-> events."""
 
 from ..widgets import (
     CalendarWidget,
+    DrawingWidget,
     EventsWidget,
     GamesWidget,
     NewsWidget,
@@ -50,10 +51,12 @@ def build_graph(settings, content_sync=None):
             {"id": HOME, "widgets": home_widgets(settings, content_sync)},
             {"id": "games", "widgets": games_widgets()},
             {"id": "events", "widgets": events_widgets(content_sync)},
+            {"id": "draw", "widgets": draw_widgets()},
         ],
         "edges": [
             *link(HOME, "games", gesture="two_fingers_swipe_right", back="two_fingers_swipe_left"),
             *link(HOME, "events", gesture="two_fingers_swipe_left", back="two_fingers_swipe_right"),
+            *link("games", "draw", gesture="two_fingers_swipe_right", back="two_fingers_swipe_left"),
         ],
     }
 
@@ -149,6 +152,11 @@ def games_widgets():
             draggable=False,
         )
     ]
+
+
+def draw_widgets():
+    # The only widget on its page: a pinch anywhere draws instead of grabbing another widget.
+    return [DrawingWidget(position={"x": 0.5, "y": 0.44})]
 
 
 def events_widgets(content_sync):

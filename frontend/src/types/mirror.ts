@@ -45,7 +45,8 @@ export type BackendMessage =
   | { type: 'INIT' | 'STATE_UPDATE'; state: MirrorState }
   | ({ type: 'CAMERA_FRAME' } & CameraFrame)
   // Index fingertip for the cursor (server/hand_pointer.py); null when the hand is lost.
-  | { type: 'POINTER'; position: PointerPosition | null }
+  // While `pinching`, the point between thumb and index: the drawing page's pen is down.
+  | { type: 'POINTER'; position: PointerPosition | null; pinching: boolean }
   // Transcript of what the chatbot heard, shown next to the camera preview; '' = only the wake word.
   | { type: 'ASSISTANT_HEARD'; text: string }
   // Someone talked to the chatbot: wakes Abdo (see assistant/Abdo.tsx).

@@ -175,7 +175,7 @@ class SmartMirrorServer:
             self.hub.broadcast_state()
 
         if self.hand_pointer is not None and self.hub.clients:
-            message = self.hand_pointer.message(result["signals"])
+            message = self.hand_pointer.message(result["signals"], result["hands"])
             if message is not None:
                 self.hub.broadcast(message)
 

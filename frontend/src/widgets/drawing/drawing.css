@@ -1,0 +1,44 @@
+/* Two classes: beats .widget's max-width whatever order the stylesheets load in. */
+.widget.drawing-widget {
+  max-width: none;
+}
+
+/* Title left, the controls on the same line to the right: every bit of height goes to the canvas. */
+.drawing-widget h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--px) * 6);
+}
+
+.drawing-hint {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--px) * 5);
+  font-family: var(--font-pixel-body);
+  font-size: calc(var(--u) * 22);
+  color: var(--px-silver);
+  text-shadow: none;
+}
+
+/* Current brush: its colour, with the size written on it. */
+.drawing-swatch {
+  min-width: calc(var(--px) * 6);
+  padding: 0 var(--px);
+  font-family: var(--font-pixel-title);
+  font-size: calc(var(--u) * 12);
+  line-height: calc(var(--px) * 6);
+  text-align: center;
+  color: var(--px-black);
+}
+
+/* cqw/cqh = the page (see .mirror-page). The height leaves room for the status line above and
+   Abdo below, both in --u: the whole canvas stays in reach on the portrait mirror and in a
+   1920x1080 window alike. */
+.drawing-canvas {
+  display: block;
+  width: 76cqw;
+  height: max(30cqh, calc(100cqh - var(--u) * 600));
+  background: rgba(0, 0, 0, 0.45);
+  image-rendering: pixelated;
+}

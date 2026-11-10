@@ -40,7 +40,7 @@ Smart-Mirror-SDK/
 │   │   ├── app/                   # the mirror app (`python -m smartmirror`)
 │   │   │   ├── main.py            # builds content sync, assistant, pages, server; runs them
 │   │   │   ├── settings.py        # Settings.from_env(): every SMARTMIRROR_* / MONGO_URI variable
-│   │   │   ├── pages.py           # the widgets and the page graph (games <-> home <-> events)
+│   │   │   ├── pages.py           # the widgets and the page graph (draw <-> games <-> home <-> events)
 │   │   │   └── frontend_dev.py    # FrontendLauncher: npm install + Vite dev server (dev convenience)
 │   │   ├── server/                # SmartMirrorServer and what it runs
 │   │   │   ├── app.py             # SmartMirrorServer: starts the loops, per-frame work, event images
@@ -244,6 +244,7 @@ Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` 
 | `GamesWidget` | `games` | Tiles for computer-vision games: `GamesWidget(games=[{id, title, icon}])`, `icon` an optional image URL |
 | `EventsWidget` | `events` | Cards for club events/projects: `EventsWidget(items=[{id, name, description, image}])`, or a `data_provider` returning `{"items": [...]}` |
 | `WeatherWidget` | `weather` | Current weather with a pixel icon; use `data_provider=OpenMeteoWeatherProvider(...)` |
+| `DrawingWidget` | `drawing` | Canvas drawn on by pinching; the frontend draws from `POINTER` messages. `left_click`/`right_click` change colour/size, `swipe_up` or `two_fingers_swipe_up` clears. `data = {color, size, clears}` |
 | `NewsWidget` | `news` | Announcements/achievements (`data = {"items": [...]}`) or placeholder `content` |
 
 ### 6.2 Data providers (`smartmirror/widgets/providers`)
@@ -258,7 +259,7 @@ A data provider is any callable, sync or async, with the signature `provider(wid
 
 - React 19 + TypeScript + Vite 7. It talks to the backend only over the WebSocket; see [protocol.md](protocol.md).
 - `mirror/MirrorCanvas.tsx` renders the active page. `WidgetSlot` looks each widget's `type` up in `widgets/registry.ts`, which auto-discovers every `widgets/<name>/index.ts` (`export default defineWidget('<type>', Component)`). Each widget is absolutely positioned at `position.x/y × 100%`. A status bar shows the connection state and the page. A widget that is being dragged gets the `widget-slot--dragging` class.
-- `CAMERA_FRAME` shows as a small webcam preview in the top-right corner with the latest gestures under it (`mirror/CameraPreview.tsx`), `POINTER` drives the hand cursor (`mirror/HandCursor.tsx`), and the `ASSISTANT_*` messages drive the Abdo avatar (`assistant/Abdo.tsx`).
+- `CAMERA_FRAME` shows as a small webcam preview in the top-right corner with the latest gestures under it (`mirror/CameraPreview.tsx`), `POINTER` drives the hand cursor (`mirror/HandCursor.tsx`) and, through `services/pointer.ts`, the drawing canvas (`widgets/drawing/`), and the `ASSISTANT_*` messages drive the Abdo avatar (`assistant/Abdo.tsx`).
 
 ---
 

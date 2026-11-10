@@ -24,7 +24,7 @@ All messages are JSON objects with a `type`.
 | `INIT` | `state` | `ClientHub.handle_client` | Once, on connect |
 | `STATE_UPDATE` | `state` | `ClientHub.broadcast_state` | The page or a widget changed (gesture, or new provider data) |
 | `CAMERA_FRAME` | `image`, `events` | `server/camera_preview.py` | At most 10×/s while a client is connected |
-| `POINTER` | `position` | `server/hand_pointer.py` | The pointing hand's fingertip moved |
+| `POINTER` | `position`, `pinching` | `server/hand_pointer.py` | The pointing hand moved, or started/stopped pinching |
 | `ASSISTANT_HEARD` | `text` | `SmartMirrorServer.assistant_heard` | The voice assistant heard a question (`""` = only the wake word) |
 | `ASSISTANT_WAKE` | none | `SmartMirrorServer.assistant_wake` | Right after `ASSISTANT_HEARD`; wakes the Abdo avatar |
 | `ASSISTANT_SAY` | `text` | `SmartMirrorServer.assistant_say` | The assistant's reply, typed into Abdo's speech bubble |
@@ -34,7 +34,7 @@ All messages are JSON objects with a `type`.
 ```json
 {
   "nodeId": "home",
-  "nodeIds": ["home", "games", "events"],
+  "nodeIds": ["home", "games", "events", "draw"],
   "widgets": [
     {
       "id": "text-4",
@@ -64,10 +64,12 @@ Only the active page's widgets are sent. A widget's `type` picks the React compo
 ### `POINTER`
 
 ```json
-{"type": "POINTER", "position": {"x": 0.42, "y": 0.31}}
+{"type": "POINTER", "position": {"x": 0.42, "y": 0.31}, "pinching": false}
 ```
 
 `position` uses the same 0–1 screen fractions as widget positions, and is `null` once the hand is lost.
+It is the index fingertip, or while `pinching`, the point between the thumb and index tips: the
+drawing widget's pen (`frontend/src/widgets/drawing/`), which draws while `pinching` is true.
 
 ## HTTP: event images
 
