@@ -29,8 +29,8 @@ QR_CATALOG = {
     "tutorial": [
         {
             "title": "IEEE INSAT CS Social Media",
-            "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://example.com/tutorial/setup",
-            "url": "https://example.com/tutorial/setup",
+            "imageUrl": "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://www.facebook.com/INSAT.CS",
+            "url": "https://www.facebook.com/INSAT.CS",
         },
     ],
     "project": [
