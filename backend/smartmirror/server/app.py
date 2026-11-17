@@ -16,6 +16,7 @@ from ..vision import GestureDetector
 from .camera import Camera, watch_frame_rate
 from .camera_preview import CameraPreview
 from .hand_pointer import HandPointer
+from .static_ui import bundled_ui_dir, is_websocket_upgrade, serve_ui_file
 from .websocket import ClientHub
 from .widget_data import refresh_widget_data
 
@@ -35,7 +36,8 @@ class SmartMirrorServer:
     shown by the Abdo avatar in the frontend.
 
     The frontend is a separate app that connects to `ws://<ws_host>:<ws_port>`
-    (see docs/protocol.md); this server doesn't start it.
+    (see docs/protocol.md). An installed package also carries a prebuilt copy of it,
+    served on the same port: http://<ws_host>:<ws_port>/ (`serve_ui=False` to turn that off).
     """
 
     def __init__(
@@ -55,6 +57,7 @@ class SmartMirrorServer:
         assistant=None,
         content_sync=None,
         widget_update_tick=0.5,
+        serve_ui=True,
     ):
         if state_manager is None:
             state_manager = StateManager(graph=graph)
@@ -84,6 +87,8 @@ class SmartMirrorServer:
         self._stop_event = threading.Event()
 
         self.widget_update_tick = widget_update_tick
+        # The prebuilt UI (smartmirror/ui/), when this install has one.
+        self.ui_dir = bundled_ui_dir() if serve_ui else None
         self.hub = ClientHub(state_manager)
         self.running = False
 
@@ -91,7 +96,7 @@ class SmartMirrorServer:
         self.running = True
         try:
             async with websockets.serve(
-                self.hub.handle_client, self.ws_host, self.ws_port, process_request=self._serve_content_image
+                self.hub.handle_client, self.ws_host, self.ws_port, process_request=self._process_http_request
             ):
                 logger.info("WebSocket server on ws://%s:%s", self.ws_host, self.ws_port)
                 tasks = [
@@ -194,11 +199,17 @@ class SmartMirrorServer:
 
     # -- HTTP: event images --------------------------------------------------------
 
-    def _serve_content_image(self, connection, request):
-        """GET /content-images/<file>: an event image. Any other request goes on to the WebSocket handshake."""
+    def _process_http_request(self, connection, request):
+        """Plain HTTP on the WebSocket port: event images, then the bundled UI. WebSocket handshakes go on."""
         path = request.path.split("?", 1)[0]
-        if not path.startswith(CONTENT_IMAGES_PATH + "/"):
-            return None
+        if path.startswith(CONTENT_IMAGES_PATH + "/"):
+            return self._serve_content_image(connection, path)
+        if self.ui_dir is not None and not is_websocket_upgrade(request):
+            return serve_ui_file(connection, request, self.ui_dir)
+        return None
+
+    def _serve_content_image(self, connection, path):
+        """GET /content-images/<file>: an event image that content sync downloaded."""
         name = path[len(CONTENT_IMAGES_PATH) + 1:]
         file = self.content_sync.images_dir / name if self.content_sync is not None else None
         if file is None or "/" in name or name.startswith(".") or not file.is_file():

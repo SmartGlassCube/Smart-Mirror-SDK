@@ -4,7 +4,7 @@ import os
 import shutil
 from pathlib import Path
 
-# <repo>/frontend, next to backend/.
+# <repo>/frontend, next to backend/. Only exists in a checkout of the repo, not in a pip install.
 DEFAULT_FRONTEND_DIR = Path(__file__).resolve().parents[3] / "frontend"
 
 logger = logging.getLogger(__name__)
@@ -23,6 +23,10 @@ class FrontendLauncher:
         self.port = port
         self.ws_port = ws_port
         self.process = None
+
+    def available(self):
+        """True when there's a frontend/ checkout (with its package.json) and npm to run it."""
+        return (self.frontend_dir / "package.json").is_file() and shutil.which("npm") is not None
 
     async def start(self):
         npm = shutil.which("npm")

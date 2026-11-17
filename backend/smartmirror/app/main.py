@@ -1,17 +1,17 @@
-"""Entry point: `python -m smartmirror` (from backend/)."""
+"""Entry point: the `smartmirror` command, or `python -m smartmirror`."""
 
 import asyncio
 import logging
 
-from ..assistant import Assistant
-from ..assistant.llm import OpenAICompatBackend
-from ..assistant.rag import SEED_CORPUS_DIR
 from ..core import StateManager
 from ..hal import HAL
 from ..server import SmartMirrorServer
+from ..server.static_ui import bundled_ui_dir
 from .frontend_dev import FrontendLauncher
 from .pages import GESTURE_CONFIG, HOME, build_graph
 from .settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def build_assistant(settings, content_sync=None):
@@ -20,7 +20,26 @@ def build_assistant(settings, content_sync=None):
 
     With `content_sync`, it retrieves from the Mongo-derived Qdrant collection and
     gets the live events/announcements prompt block instead of the seed corpus.
+
+    None when disabled (SMARTMIRROR_ASSISTANT=0) or when the `assistant` extra isn't installed.
     """
+    if not settings.assistant:
+        return None
+    try:
+        return _assistant(settings, content_sync)
+    except ImportError as error:  # the `assistant` extra isn't installed
+        logger.warning(
+            "Voice assistant off: %s. Install it with `pip install \"smartmirror[assistant]\"`, "
+            "or set SMARTMIRROR_ASSISTANT=0 to hide this.", error,
+        )
+        return None
+
+
+def _assistant(settings, content_sync):
+    from ..assistant import Assistant
+    from ..assistant.llm import OpenAICompatBackend
+    from ..assistant.rag import SEED_CORPUS_DIR
+
     hal = HAL(input_device=settings.mic)
     backend = OpenAICompatBackend(
         api_key=settings.llm_api_key,
@@ -71,6 +90,20 @@ async def run(server, frontend=None):
             await frontend.stop()
 
 
+def build_frontend(settings):
+    """The Vite dev server in a checkout with npm; None when the bundled UI is served instead (or turned off)."""
+    if not settings.frontend:
+        return None
+    launcher = FrontendLauncher(port=settings.frontend_port, ws_port=settings.ws_port)
+    if launcher.available():
+        return launcher
+    if bundled_ui_dir() is not None:
+        logger.info("Mirror UI on http://localhost:%s", settings.ws_port)
+    else:
+        logger.warning("No mirror UI: this install has no bundled UI and there's no frontend/ checkout to run.")
+    return None
+
+
 def main():
     # INFO on the smartmirror.* loggers surfaces the voice pipeline's play-by-play
     # (VAD, raw Whisper transcripts, wake-word matches; see docs/voice-pipeline-testing.md).
@@ -80,7 +113,8 @@ def main():
 
     settings = Settings.from_env()
     server = build_server(settings)
-    frontend = (
-        FrontendLauncher(port=settings.frontend_port, ws_port=settings.ws_port) if settings.frontend else None
-    )
-    asyncio.run(run(server, frontend))
+    frontend = build_frontend(settings)
+    try:
+        asyncio.run(run(server, frontend))
+    except KeyboardInterrupt:
+        pass

@@ -1,14 +1,30 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "smartmirror"
-version = "0.1.0"
-description = "Local-first smart mirror OS with WebSocket-driven UI"
+dynamic = ["version"]  # smartmirror/__init__.py: __version__
+description = "Build gesture-controlled smart mirrors: webcam hand gestures drive pages and widgets of a React UI, plus a voice assistant"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["smart mirror", "gesture recognition", "hand tracking", "mediapipe", "computer vision", "voice assistant", "websocket"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Education",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Video :: Capture",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+  "Topic :: Home Automation",
+]
 
 authors = [
   { name = "Moetez Fradi", email = "moetezfradi7@gmail.com" }
@@ -17,9 +33,18 @@ authors = [
 dependencies = [
   "mediapipe>=0.10.0",
   "opencv-python>=4.8.0",
-  "websockets>=12.0",
+  "websockets>=14.0",
   "numpy>=1.24.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/SmartGlassCube/Smart-Mirror-SDK"
+Documentation = "https://github.com/SmartGlassCube/Smart-Mirror-SDK/tree/main/docs"
+Repository = "https://github.com/SmartGlassCube/Smart-Mirror-SDK"
+Issues = "https://github.com/SmartGlassCube/Smart-Mirror-SDK/issues"
+
+[project.scripts]
+smartmirror = "smartmirror.app.main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -57,6 +82,9 @@ dev = [
   "pytest-asyncio>=1.2.0",
 ]
 
+[tool.setuptools.dynamic]
+version = { attr = "smartmirror.__version__" }
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["smartmirror*"]
@@ -65,6 +93,9 @@ include = ["smartmirror*"]
 smartmirror = [
   "config/json_config/*.json",
   "assistant/rag/seed_corpus/*",
+  # The prebuilt UI: scripts/build_frontend.py, run before building the package
+  "ui/*",
+  "ui/assets/*",
 ]
 
 [tool.pytest.ini_options]

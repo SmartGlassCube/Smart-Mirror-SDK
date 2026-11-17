@@ -44,7 +44,7 @@ def test_server_serves_event_images_next_to_the_websocket(tmp_path):
     async def main():
         nonlocal port
         async with websockets.serve(server.hub.handle_client, "127.0.0.1", 0,
-                                    process_request=server._serve_content_image) as ws_server:
+                                    process_request=server._process_http_request) as ws_server:
             port = ws_server.sockets[0].getsockname()[1]
             image = await asyncio.to_thread(get, "/content-images/abc123.png")
             missing = await asyncio.to_thread(get, "/content-images/nope.png")

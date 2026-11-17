@@ -7,6 +7,11 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
+# Build outputs: the prebuilt mirror UI (backend/scripts/build_frontend.py) and the dists
+backend/smartmirror/ui/
+backend/dist/
+backend/build/
+
 # Secrets (copy backend/.env.example to backend/.env)
 .env
 

@@ -48,6 +48,7 @@ Smart-Mirror-SDK/
 │   │   │   ├── websocket.py       # ClientHub: connected clients, INIT + broadcasts
 │   │   │   ├── camera_preview.py  # CameraPreview: small annotated webcam frame + latest gestures
 │   │   │   ├── hand_pointer.py    # HandPointer: fingertip position for the frontend's cursor
+│   │   │   ├── static_ui.py       # Serves the prebuilt UI (smartmirror/ui/, pip installs) on the WS port
 │   │   │   └── widget_data.py     # Calls widget data providers on their refresh interval
 │   │   ├── vision/                # Hand tracking + gestures (see vision.md)
 │   │   │   ├── landmark_detector.py  gesture_detector.py  hand_data.py  gesture_types.py  debug_overlay.py
@@ -79,8 +80,8 @@ Smart-Mirror-SDK/
 ```
 
 Runtime files (the downloaded hand-tracking model, the embedded Qdrant store, the
-content cache) go in `backend/.data/` (`SMARTMIRROR_DATA_DIR` to move them), never in
-the source tree.
+content cache) go in `backend/.data/` in a checkout, or the user data folder once
+pip-installed (`SMARTMIRROR_DATA_DIR` to move them), never in the source tree.
 
 ---
 

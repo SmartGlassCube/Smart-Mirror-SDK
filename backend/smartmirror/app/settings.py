@@ -1,4 +1,5 @@
-"""The mirror app's settings: environment variables, plus backend/.env when python-dotenv is installed.
+"""The mirror app's settings: environment variables, plus a .env file when python-dotenv is installed
+(./.env in the working directory, then backend/.env in a checkout of the repo).
 
 See backend/.env.example for every variable.
 """
@@ -8,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Union
 
-BACKEND_DIR = Path(__file__).resolve().parents[2]
+from ..config.paths import CHECKOUT_BACKEND_DIR
 
 # A camera/microphone: None (the default device), a local device index, or an
 # http:// URL served by scripts/lan_media_server.py on another machine.
@@ -30,12 +31,17 @@ def flag_from_env(name: str, default: bool) -> bool:
 
 
 def load_dotenv_file() -> None:
-    """Load backend/.env into os.environ (variables already set win). No-op without python-dotenv."""
+    """Load ./.env, then backend/.env in a checkout, into os.environ.
+
+    Variables already set win, and so does the first file. No-op without python-dotenv.
+    """
     try:
         from dotenv import load_dotenv
     except ImportError:
         return
-    load_dotenv(BACKEND_DIR / ".env")
+    load_dotenv(Path.cwd() / ".env")
+    if CHECKOUT_BACKEND_DIR is not None:
+        load_dotenv(CHECKOUT_BACKEND_DIR / ".env")
 
 
 @dataclass(frozen=True)
@@ -55,8 +61,12 @@ class Settings:
     calendar_mongo_db: str = "smartmirror"
     calendar_mongo_collection: str = "events"
 
+    # The voice assistant; it also needs the `assistant` extra (skipped with a warning without it).
+    assistant: bool = True
+
     ws_port: int = 8080
-    # Start the frontend's Vite dev server along with the backend (dev convenience).
+    # In a checkout, start the frontend's Vite dev server along with the backend (dev convenience).
+    # Otherwise the bundled, prebuilt UI is served on ws_port: http://localhost:8080.
     frontend: bool = True
     frontend_port: int = 5173
 
@@ -74,6 +84,7 @@ class Settings:
             calendar_mongo_uri=os.getenv("SMARTMIRROR_MONGO_READ_URI") or None,
             calendar_mongo_db=os.getenv("SMARTMIRROR_MONGO_DB", defaults.calendar_mongo_db),
             calendar_mongo_collection=os.getenv("SMARTMIRROR_MONGO_COLLECTION", defaults.calendar_mongo_collection),
+            assistant=flag_from_env("SMARTMIRROR_ASSISTANT", defaults.assistant),
             ws_port=int(os.getenv("SMARTMIRROR_WS_PORT", defaults.ws_port)),
             frontend=flag_from_env("SMARTMIRROR_FRONTEND", defaults.frontend),
             frontend_port=int(os.getenv("SMARTMIRROR_FRONTEND_PORT", defaults.frontend_port)),

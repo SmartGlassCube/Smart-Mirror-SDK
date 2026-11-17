@@ -10,7 +10,18 @@ A local-first SDK for gesture-controlled smart mirrors: webcam → hand gestures
 
 The two halves share no code: they talk only over the WebSocket described in [docs/protocol.md](docs/protocol.md).
 
-## Quickstart (mirror only, no Mongo)
+## Install from PyPI
+
+```bash
+pip install smartmirror        # or "smartmirror[assistant]" for the voice assistant
+smartmirror                    # then open http://localhost:8080
+```
+
+The package ships a prebuilt copy of the UI, so it needs no Node. See [backend/README.md](backend/README.md)
+(also the PyPI page) for building your own mirror. Releases: push a `vX.Y.Z` tag matching
+`backend/smartmirror/__init__.py`; [publish.yml](.github/workflows/publish.yml) builds and uploads it.
+
+## Quickstart from a checkout (mirror only, no Mongo)
 
 Needs [uv](https://docs.astral.sh/uv/), Node/npm and a webcam.
 
