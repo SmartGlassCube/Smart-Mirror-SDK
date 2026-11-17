@@ -1,7 +1,7 @@
-"""Build ../frontend into smartmirror/ui/, the prebuilt UI that ships in the package.
+"""Build ../frontend into glasscube/ui/, the prebuilt UI that ships in the package.
 
 Run before `uv build` (the PyPI workflow does): `uv run python scripts/build_frontend.py`.
-Needs Node/npm. The server serves the result on its WebSocket port (smartmirror/server/static_ui.py).
+Needs Node/npm. The server serves the result on its WebSocket port (glasscube/server/static_ui.py).
 """
 
 import shutil
@@ -11,7 +11,7 @@ from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 FRONTEND_DIR = BACKEND_DIR.parent / "frontend"
-UI_DIR = BACKEND_DIR / "smartmirror" / "ui"
+UI_DIR = BACKEND_DIR / "glasscube" / "ui"
 
 
 def main() -> int:

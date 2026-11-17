@@ -1,7 +1,7 @@
 """End-to-end: a real Assistant, backed by the Mongo-derived content, answers a question.
 
 Uses whichever OpenAI-compatible endpoint examples/mvp.py defaults to (local
-Ollama, SMARTMIRROR_LLM_* env vars to override). If nothing answers there,
+Ollama, GLASSCUBE_LLM_* env vars to override). If nothing answers there,
 falls back to asserting retrieval + prompt-block assembly only, and skips
 the actual chat() call with a clear reason.
 """
@@ -10,16 +10,16 @@ import os
 import httpx
 import pytest
 
-from smartmirror.assistant import Assistant
-from smartmirror.assistant.llm import OpenAICompatBackend
+from glasscube.assistant import Assistant
+from glasscube.assistant.llm import OpenAICompatBackend
 
 from .conftest import make_about, make_event, requires_mongo
 
 pytestmark = requires_mongo
 
-LLM_BASE_URL = os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1")
-LLM_MODEL = os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b")
-LLM_API_KEY = os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama")
+LLM_BASE_URL = os.getenv("GLASSCUBE_LLM_BASE_URL", "http://localhost:11434/v1")
+LLM_MODEL = os.getenv("GLASSCUBE_LLM_MODEL", "qwen2.5:0.5b")
+LLM_API_KEY = os.getenv("GLASSCUBE_LLM_API_KEY", "ollama")
 
 
 def _llm_reachable() -> bool:
@@ -59,7 +59,7 @@ def test_retrieval_and_prompt_block_contain_the_answer_regardless_of_llm(mongo_d
     block = content_sync.prompt_block()
     assert "Robotics Expo 2026" in block
 
-    from smartmirror.assistant.rag import Retriever
+    from glasscube.assistant.rag import Retriever
     retriever = Retriever(store=content_sync.indexer.store, embedder=content_sync.indexer.embedder)
     chunks = retriever.retrieve("What is the next event?")
     assert any("Robotics Expo 2026" in chunk for chunk in chunks)

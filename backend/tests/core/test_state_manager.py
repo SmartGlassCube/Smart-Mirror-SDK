@@ -1,8 +1,8 @@
 import pytest
 
-from smartmirror.core import StateManager
-from smartmirror.vision import GestureEvent, GestureType
-from smartmirror.widgets import BaseWidget, CalendarWidget, TextWidget
+from glasscube.core import StateManager
+from glasscube.vision import GestureEvent, GestureType
+from glasscube.widgets import BaseWidget, CalendarWidget, TextWidget
 
 
 def event(name, location=None, hand="right", data=None):

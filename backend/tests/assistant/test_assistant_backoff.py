@@ -2,7 +2,7 @@ import asyncio
 import threading
 from types import SimpleNamespace
 
-from smartmirror.assistant.assistant import FAILURE_BACKOFF_MAX_SECONDS, Assistant
+from glasscube.assistant.assistant import FAILURE_BACKOFF_MAX_SECONDS, Assistant
 
 
 class RecordingStop(threading.Event):
@@ -69,7 +69,7 @@ def test_a_new_error_after_the_mic_recovers_waits_1s_and_logs_its_traceback(capl
     assistant = bare_assistant(hear)
     assistant._answer = answer
     stop = RecordingStop(limit=3)
-    with caplog.at_level("WARNING", logger="smartmirror.assistant.assistant"):
+    with caplog.at_level("WARNING", logger="glasscube.assistant.assistant"):
         asyncio.run(assistant.listen_loop(stop_event=stop))
 
     assert stop.waits == [1, 2, 1]

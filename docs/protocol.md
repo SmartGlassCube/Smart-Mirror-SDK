@@ -3,18 +3,18 @@
 The backend (`backend/`) and the frontend (`frontend/`) share no code. This page is
 the whole contract between them. When you change a message, update both sides:
 
-- backend: `smartmirror/server/websocket.py` (`ClientHub`) and the senders listed below
+- backend: `glasscube/server/websocket.py` (`ClientHub`) and the senders listed below
 - frontend: `src/types/mirror.ts` (`BackendMessage`) and `src/services/useWebSocket.ts`
 
 ## Connection
 
-- The frontend connects to `ws://<page host>:<VITE_SMARTMIRROR_WS_PORT>` (default `8080`)
+- The frontend connects to `ws://<page host>:<VITE_GLASSCUBE_WS_PORT>` (default `8080`)
   and reconnects every 2 s.
-- `VITE_SMARTMIRROR_WS_PORT` is set when `python -m smartmirror` starts the Vite dev
-  server, from `SMARTMIRROR_WS_PORT`. Start the frontend by hand on another port with
-  `VITE_SMARTMIRROR_WS_PORT=8090 npm run dev`.
+- `VITE_GLASSCUBE_WS_PORT` is set when `python -m glasscube` starts the Vite dev
+  server, from `GLASSCUBE_WS_PORT`. Start the frontend by hand on another port with
+  `VITE_GLASSCUBE_WS_PORT=8090 npm run dev`.
 - A production build served by the backend itself (a pip install, see
-  `smartmirror/server/static_ui.py`) connects to the page's own host and port instead.
+  `glasscube/server/static_ui.py`) connects to the page's own host and port instead.
   `?ws=ws://<host>:<port>` in the page URL overrides all of this.
 - Server → client only. Client messages are logged and ignored.
 
@@ -76,7 +76,7 @@ drawing widget's pen (`frontend/src/widgets/drawing/`), which draws while `pinch
 
 ## HTTP: the bundled UI and event images
 
-When the package carries a prebuilt UI (`smartmirror/ui/`, built by
+When the package carries a prebuilt UI (`glasscube/ui/`, built by
 `backend/scripts/build_frontend.py`), every plain HTTP `GET` on the WebSocket port that
 isn't a WebSocket handshake is served from it: `/` is `index.html`.
 

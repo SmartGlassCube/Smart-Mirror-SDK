@@ -5,7 +5,7 @@ from pathlib import Path
 
 import websockets
 
-from smartmirror.server import SmartMirrorServer
+from glasscube.server import SmartMirrorServer
 
 
 class FakeContentSync:

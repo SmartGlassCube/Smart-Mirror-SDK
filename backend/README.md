@@ -1,4 +1,4 @@
-# smartmirror
+# glasscube
 
 Build gesture-controlled smart mirrors in Python. A webcam watches your hands,
 [MediaPipe](https://developers.google.com/mediapipe) hand tracking turns their movement
@@ -11,9 +11,9 @@ Everything runs locally: no account, no cloud service required.
 ## Install
 
 ```bash
-pip install smartmirror                 # gestures, pages, widgets, the server and its UI
-pip install "smartmirror[assistant]"    # + the voice assistant
-pip install "smartmirror[data]"         # + MongoDB providers and .env support
+pip install glasscube                 # gestures, pages, widgets, the server and its UI
+pip install "glasscube[assistant]"    # + the voice assistant
+pip install "glasscube[data]"         # + MongoDB providers and .env support
 ```
 
 Python 3.9 or newer (3.10 to 3.12 for the `assistant` extra, whose speech models lag behind), and a webcam.
@@ -21,7 +21,7 @@ Python 3.9 or newer (3.10 to 3.12 for the `assistant` extra, whose speech models
 ## Run the demo mirror
 
 ```bash
-smartmirror
+glasscube
 ```
 
 Then open <http://localhost:8080> (full screen it on the mirror's display). Raise a hand
@@ -30,16 +30,16 @@ page, a pinch grabs and moves a widget. Without a camera it still starts, with n
 
 The voice assistant runs when the `assistant` extra is installed. It uses
 [Ollama](https://ollama.com) by default (`ollama pull qwen2.5:0.5b`, then `ollama serve`);
-point it at any OpenAI-compatible endpoint with `SMARTMIRROR_LLM_BASE_URL`,
-`SMARTMIRROR_LLM_MODEL` and `SMARTMIRROR_LLM_API_KEY`, or turn it off with
-`SMARTMIRROR_ASSISTANT=0`.
+point it at any OpenAI-compatible endpoint with `GLASSCUBE_LLM_BASE_URL`,
+`GLASSCUBE_LLM_MODEL` and `GLASSCUBE_LLM_API_KEY`, or turn it off with
+`GLASSCUBE_ASSISTANT=0`.
 
 Settings are environment variables, also read from a `.env` file in the working directory
 (with the `data` extra). The full list is in
 [.env.example](https://github.com/SmartGlassCube/Smart-Mirror-SDK/blob/main/backend/.env.example).
 Runtime files (the downloaded hand model, the assistant's vector store) go in your user
-data folder (`~/.local/share/smartmirror`, `%LOCALAPPDATA%\smartmirror` or
-`~/Library/Application Support/smartmirror`); move them with `SMARTMIRROR_DATA_DIR`.
+data folder (`~/.local/share/glasscube`, `%LOCALAPPDATA%\glasscube` or
+`~/Library/Application Support/glasscube`); move them with `GLASSCUBE_DATA_DIR`.
 
 ## Build your own mirror
 
@@ -48,9 +48,9 @@ A mirror is a graph: pages (nodes) hold widgets, and gestures (edges) move betwe
 ```python
 import asyncio
 
-from smartmirror.server import SmartMirrorServer
-from smartmirror.widgets import CalendarWidget, TextWidget, WeatherWidget
-from smartmirror.widgets.providers import OpenMeteoWeatherProvider
+from glasscube.server import SmartMirrorServer
+from glasscube.widgets import CalendarWidget, TextWidget, WeatherWidget
+from glasscube.widgets.providers import OpenMeteoWeatherProvider
 
 weather = WeatherWidget(
     position={"x": 0.1, "y": 0.1},           # fractions of the screen
@@ -65,7 +65,7 @@ agenda = CalendarWidget(
 )
 tips = TextWidget(
     position={"x": 0.5, "y": 0.5},
-    content={"tips": ["Swipe to cycle", "Scroll for sections"], "about": ["Made with smartmirror"]},
+    content={"tips": ["Swipe to cycle", "Scroll for sections"], "about": ["Made with glasscube"]},
 )
 
 graph = {
@@ -90,8 +90,8 @@ Built-in widgets: `TextWidget`, `WeatherWidget`, `CalendarWidget`, `NewsWidget`,
 ### Your own gestures, widgets and reactions
 
 ```python
-from smartmirror.core import StateManager
-from smartmirror.vision import Gesture, GestureDetector, GestureEvent, SIDES, default_gesture_set
+from glasscube.core import StateManager
+from glasscube.vision import Gesture, GestureDetector, GestureEvent, SIDES, default_gesture_set
 
 class FistGesture(Gesture):
     name = "fist"
@@ -134,16 +134,16 @@ in `backend/`, with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync --extra data --extra assistant   # backend/.venv; plain `uv sync` = gestures + server only
-uv run smartmirror                       # also starts ../frontend's Vite dev server (needs npm)
+uv run glasscube                       # also starts ../frontend's Vite dev server (needs npm)
 uv run pytest                            # no camera needed
-uv run python scripts/build_frontend.py  # bundle the UI into smartmirror/ui/ before `uv build`
+uv run python scripts/build_frontend.py  # bundle the UI into glasscube/ui/ before `uv build`
 ```
 
 | Path | |
 |---|---|
-| `smartmirror/app/` | The demo mirror app: `settings.py` (env vars), `pages.py` (widgets + page graph), `main.py` |
-| `smartmirror/server/` | `SmartMirrorServer`: WebSocket, camera loop, widget refresh, assistant hooks, the bundled UI |
-| `smartmirror/{vision,core,widgets,assistant,content,hal,config}/` | The SDK pieces, usable on their own |
+| `glasscube/app/` | The demo mirror app: `settings.py` (env vars), `pages.py` (widgets + page graph), `main.py` |
+| `glasscube/server/` | `SmartMirrorServer`: WebSocket, camera loop, widget refresh, assistant hooks, the bundled UI |
+| `glasscube/{vision,core,widgets,assistant,content,hal,config}/` | The SDK pieces, usable on their own |
 | `tests/` | One folder per package |
 | `scripts/` | `lan_media_server.py` (share a camera/mic over the LAN), `content_sync_daemon.py`, `build_frontend.py`, checks |
 | `examples/` | `gesture_detector_debug.py`: annotated camera window + gesture feed |

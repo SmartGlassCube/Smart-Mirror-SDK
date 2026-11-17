@@ -1,6 +1,6 @@
 import pytest
 
-from smartmirror.assistant.rag import VectorStore
+from glasscube.assistant.rag import VectorStore
 
 
 def test_add_and_query_returns_nearest_chunk(tmp_path, embedder):

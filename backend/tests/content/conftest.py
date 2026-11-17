@@ -8,11 +8,11 @@ import pytest
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
-from smartmirror.assistant.rag import Embedder, VectorStore
-from smartmirror.content.cache import ContentCache
-from smartmirror.content.config import COLLECTIONS, ContentSyncConfig
-from smartmirror.content.indexer import ContentIndexer
-from smartmirror.content.sync import ContentSync
+from glasscube.assistant.rag import Embedder, VectorStore
+from glasscube.content.cache import ContentCache
+from glasscube.content.config import COLLECTIONS, ContentSyncConfig
+from glasscube.content.indexer import ContentIndexer
+from glasscube.content.sync import ContentSync
 
 # Mongo is owned by the Dashboard repo (../Dashboard) -- these tests just
 # need MONGO_URI (same var the content sync itself reads) to point at it.

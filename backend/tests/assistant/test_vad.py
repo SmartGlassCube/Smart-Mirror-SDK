@@ -1,6 +1,6 @@
 import numpy as np
 
-from smartmirror.assistant.stt.vad import NoiseFloor, capture_utterance
+from glasscube.assistant.stt.vad import NoiseFloor, capture_utterance
 
 LOUD = np.full(10, 5000, dtype=np.int16)
 QUIET = np.zeros(10, dtype=np.int16)
@@ -54,7 +54,7 @@ def test_hits_max_total_blocks_cap():
 def test_logs_when_an_utterance_is_captured(caplog):
     blocks = [LOUD, LOUD] + [QUIET] * 15
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.vad"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.vad"):
         capture_utterance(iter(blocks), threshold=500, silence_blocks=15, min_speech_blocks=2)
 
     assert any("utterance captured" in message for message in caplog.messages)
@@ -63,7 +63,7 @@ def test_logs_when_an_utterance_is_captured(caplog):
 def test_does_not_log_a_capture_when_stream_ends_without_one(caplog):
     blocks = [QUIET, QUIET]
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.vad"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.vad"):
         capture_utterance(iter(blocks), threshold=500)
 
     assert not any("utterance captured" in message for message in caplog.messages)

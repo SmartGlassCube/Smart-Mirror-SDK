@@ -4,7 +4,7 @@ A local-first SDK for gesture-controlled smart mirrors: webcam → hand gestures
 
 | Folder | What | Stack |
 |---|---|---|
-| [`backend/`](backend/README.md) | The `smartmirror` Python package (vision, state, widgets, assistant, content sync, server) and the mirror app | Python, uv |
+| [`backend/`](backend/README.md) | The `glasscube` Python package (vision, state, widgets, assistant, content sync, server) and the mirror app | Python, uv |
 | [`frontend/`](frontend/README.md) | The mirror's UI | React, TypeScript, Vite |
 | [`docs/`](docs/) | [Architecture](docs/architecture.md), [backend ↔ frontend protocol](docs/protocol.md), [extending](docs/extending.md), [vision](docs/vision.md), [voice testing](docs/voice-pipeline-testing.md) | |
 
@@ -13,13 +13,13 @@ The two halves share no code: they talk only over the WebSocket described in [do
 ## Install from PyPI
 
 ```bash
-pip install smartmirror        # or "smartmirror[assistant]" for the voice assistant
-smartmirror                    # then open http://localhost:8080
+pip install glasscube        # or "glasscube[assistant]" for the voice assistant
+glasscube                    # then open http://localhost:8080
 ```
 
 The package ships a prebuilt copy of the UI, so it needs no Node. See [backend/README.md](backend/README.md)
 (also the PyPI page) for building your own mirror. Releases: push a `vX.Y.Z` tag matching
-`backend/smartmirror/__init__.py`; [publish.yml](.github/workflows/publish.yml) builds and uploads it.
+`backend/glasscube/__init__.py`; [publish.yml](.github/workflows/publish.yml) builds and uploads it.
 
 ## Quickstart from a checkout (mirror only, no Mongo)
 
@@ -28,7 +28,7 @@ Needs [uv](https://docs.astral.sh/uv/), Node/npm and a webcam.
 ```bash
 cd backend
 uv sync --extra data --extra assistant   # first time: creates backend/.venv (pulls in torch)
-uv run python -m smartmirror             # backend on :8080, also starts the frontend on :5173
+uv run python -m glasscube               # backend on :8080, also starts the frontend on :5173
 ```
 
 Tests: `cd backend && uv run pytest`. Settings: copy `backend/.env.example` to `backend/.env`.
@@ -55,7 +55,7 @@ Start that repo's `./dev.sh up` first, then:
 
 For a mirror (e.g. a Raspberry Pi) without its own camera or microphone, run
 `uv run python scripts/lan_media_server.py --allow <mirror-ip>` in `backend/` on a machine
-that has them, and point the mirror's `SMARTMIRROR_CAMERA` / `SMARTMIRROR_MIC` at it
+that has them, and point the mirror's `GLASSCUBE_CAMERA` / `GLASSCUBE_MIC` at it
 (see `backend/.env.example`).
 
 Past work logs: [docs/history/](docs/history/).

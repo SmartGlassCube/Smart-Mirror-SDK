@@ -1,6 +1,6 @@
 import pytest
 
-from smartmirror.assistant.tools import ToolManager
+from glasscube.assistant.tools import ToolManager
 
 
 def test_tool_manager_register_and_specs():

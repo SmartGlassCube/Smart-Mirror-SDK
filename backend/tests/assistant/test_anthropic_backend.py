@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from smartmirror.assistant.llm import AnthropicBackend
+from glasscube.assistant.llm import AnthropicBackend
 
 CREATE_PATH = "anthropic.resources.messages.messages.Messages.create"
 

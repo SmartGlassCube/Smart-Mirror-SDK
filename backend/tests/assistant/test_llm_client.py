@@ -1,4 +1,4 @@
-from smartmirror.assistant.llm import LLMClient
+from glasscube.assistant.llm import LLMClient
 
 
 def test_complete_delegates_to_backend(fake_backend):

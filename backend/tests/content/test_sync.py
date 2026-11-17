@@ -1,6 +1,6 @@
 """Integration tests against a real local Mongo (see conftest.requires_mongo).
 
-Run: ../Dashboard/dev.sh up && uv run pytest smartmirror/content/tests -q
+Run: ../Dashboard/dev.sh up && uv run pytest glasscube/content/tests -q
 (Mongo is owned by the Dashboard repo now -- see MONGO_URI in this repo's .env)
 """
 import threading
@@ -13,7 +13,7 @@ pytestmark = requires_mongo
 
 
 def _retrieve_sources(content_sync, query, top_k=10):
-    from smartmirror.assistant.rag import Retriever
+    from glasscube.assistant.rag import Retriever
     retriever = Retriever(store=content_sync.indexer.store, embedder=content_sync.indexer.embedder, top_k=top_k)
     [query_embedding] = content_sync.indexer.embedder.embed(query)
     return {r["source"] for r in content_sync.indexer.store.query(query_embedding, top_k=top_k)}
@@ -193,7 +193,7 @@ def test_embedding_model_mismatch_triggers_full_rebuild(mongo_db, content_sync):
 
 
 def test_template_version_change_triggers_full_rebuild(mongo_db, content_sync, monkeypatch):
-    from smartmirror.content import templates
+    from glasscube.content import templates
 
     make_event(mongo_db, title="Re-render Me")
     content_sync.reconcile()
@@ -229,11 +229,11 @@ def test_prompt_block_assembles_from_cache(mongo_db, content_sync):
 
 
 def test_mongo_down_does_not_raise(cache_dir, qdrant_collection, shared_embedder, tmp_path):
-    from smartmirror.assistant.rag import VectorStore
-    from smartmirror.content.cache import ContentCache
-    from smartmirror.content.config import ContentSyncConfig
-    from smartmirror.content.indexer import ContentIndexer
-    from smartmirror.content.sync import ContentSync
+    from glasscube.assistant.rag import VectorStore
+    from glasscube.content.cache import ContentCache
+    from glasscube.content.config import ContentSyncConfig
+    from glasscube.content.indexer import ContentIndexer
+    from glasscube.content.sync import ContentSync
 
     config = ContentSyncConfig()
     config.mongo_uri = "mongodb://127.0.0.1:1/?directConnection=true&serverSelectionTimeoutMS=200"
@@ -251,7 +251,7 @@ def test_mongo_down_does_not_raise(cache_dir, qdrant_collection, shared_embedder
 
 
 def test_contract_version_match_or_missing_allows_sync(mongo_db, content_sync):
-    from smartmirror.content.config import CONTRACT_VERSION
+    from glasscube.content.config import CONTRACT_VERSION
 
     # No _meta doc at all (the conftest's lightweight schema doesn't create one).
     assert content_sync.check_contract_version() is True
@@ -266,7 +266,7 @@ def test_contract_version_match_or_missing_allows_sync(mongo_db, content_sync):
 
 
 def test_contract_version_major_mismatch_refuses_to_sync(mongo_db, content_sync):
-    from smartmirror.content.config import CONTRACT_VERSION
+    from glasscube.content.config import CONTRACT_VERSION
 
     fake_major = str(int(CONTRACT_VERSION.split(".", 1)[0]) + 1)
     mongo_db["_meta"].update_one(
@@ -289,7 +289,7 @@ def test_contract_version_major_mismatch_refuses_to_sync(mongo_db, content_sync)
 
 
 def test_contract_version_minor_difference_is_compatible(mongo_db, content_sync):
-    from smartmirror.content.config import CONTRACT_VERSION
+    from glasscube.content.config import CONTRACT_VERSION
 
     major, minor = CONTRACT_VERSION.split(".", 1)
     other_minor = f"{major}.{int(minor) + 1}"
@@ -327,7 +327,7 @@ def test_reconcile_prints_the_content_that_came_from_the_dashboard(mongo_db, con
     make_event(mongo_db, title="CS Workshop", chapter="cs", location="Lab 3")
     make_event(mongo_db, title="Draft Event", status="draft")
 
-    with caplog.at_level("INFO", logger="smartmirror.content.sync"):
+    with caplog.at_level("INFO", logger="glasscube.content.sync"):
         content_sync.reconcile()
 
     dump = next(m for m in caplog.messages if m.startswith("Content from the dashboard"))

@@ -1,7 +1,7 @@
 import asyncio
 
-from smartmirror.hal import HAL
-from smartmirror.server import SmartMirrorServer
+from glasscube.hal import HAL
+from glasscube.server import SmartMirrorServer
 
 
 class FakeAssistant:

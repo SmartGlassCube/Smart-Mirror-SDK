@@ -3,8 +3,8 @@ import base64
 import cv2
 import numpy as np
 
-from smartmirror.server.camera_preview import CameraPreview, downscale, to_data_url
-from smartmirror.vision import GestureDetector, PinchGesture
+from glasscube.server.camera_preview import CameraPreview, downscale, to_data_url
+from glasscube.vision import GestureDetector, PinchGesture
 from tests.hands import hands, make_hand
 
 PREFIX = "data:image/jpeg;base64,"

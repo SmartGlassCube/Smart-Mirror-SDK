@@ -1,4 +1,4 @@
-from smartmirror.assistant.rag.embedder import EMBEDDING_DIM
+from glasscube.assistant.rag.embedder import EMBEDDING_DIM
 
 
 def test_embed_single_string_returns_one_vector(embedder):

@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from smartmirror.assistant.stt import WhisperSTT
+from glasscube.assistant.stt import WhisperSTT
 
 MODEL_PATH = "pywhispercpp.model.Model"
 
@@ -85,7 +85,7 @@ def test_transcribe_always_logs_the_raw_transcript(caplog):
     fake_model = _fake_model("turn on the lights")
 
     with patch(MODEL_PATH, return_value=fake_model), caplog.at_level(
-        "INFO", logger="smartmirror.assistant.stt.whisper"
+        "INFO", logger="glasscube.assistant.stt.whisper"
     ):
         stt = WhisperSTT(model="base.en")
         stt.transcribe(np.zeros(10, dtype=np.int16))

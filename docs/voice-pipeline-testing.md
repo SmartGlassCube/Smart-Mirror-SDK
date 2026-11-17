@@ -15,12 +15,12 @@ hardware, without regressing gesture navigation.
    ollama serve &
    ollama pull qwen2.5:0.5b
    ```
-   Using a different endpoint instead? Set `SMARTMIRROR_LLM_API_KEY`,
-   `SMARTMIRROR_LLM_BASE_URL`, `SMARTMIRROR_LLM_MODEL` in `backend/.env` before running the mirror.
+   Using a different endpoint instead? Set `GLASSCUBE_LLM_API_KEY`,
+   `GLASSCUBE_LLM_BASE_URL`, `GLASSCUBE_LLM_MODEL` in `backend/.env` before running the mirror.
 3. Download a Piper voice (TTS is enabled by default in the mirror app):
    ```
    python -m piper.download_voices en_US-lessac-medium \
-     --download-dir ~/.local/share/smartmirror/piper_voices
+     --download-dir ~/.local/share/glasscube/piper_voices
    ```
    (Skipping this is fine too -- PiperTTS.speak() raises a clear error
    naming the exact command above instead of failing silently, but the
@@ -32,7 +32,7 @@ hardware, without regressing gesture navigation.
 ## Run
 
 ```
-cd backend && uv run python -m smartmirror
+cd backend && uv run python -m glasscube
 ```
 
 Watch the terminal for `WebSocket server on ws://localhost:8080`, then open
@@ -51,12 +51,12 @@ including the new assistant widget near the bottom-left with the prompt
    (a question the seed corpus can answer). Expect, within a few seconds,
    in the terminal (see "Reading the logs" below for what each line means):
    ```
-   smartmirror.assistant.stt.wake_word INFO Listening for wake word 'abdou'...
-   smartmirror.assistant.stt.vad INFO VAD: utterance captured (... speech blocks, ... samples) -- handing off to STT
-   smartmirror.assistant.stt.whisper INFO Whisper transcript: 'Abdu, what is IEEE INSAT?'
-   smartmirror.assistant.stt.wake_word INFO Wake word check: heard '...', comparing 'abdu' to 'abdou' -- similarity=0.89 -- MATCH
-   smartmirror.assistant.assistant INFO Answering question: 'what is IEEE INSAT?'
-   smartmirror.assistant.assistant INFO Answer: '...'
+   glasscube.assistant.stt.wake_word INFO Listening for wake word 'abdou'...
+   glasscube.assistant.stt.vad INFO VAD: utterance captured (... speech blocks, ... samples) -- handing off to STT
+   glasscube.assistant.stt.whisper INFO Whisper transcript: 'Abdu, what is IEEE INSAT?'
+   glasscube.assistant.stt.wake_word INFO Wake word check: heard '...', comparing 'abdu' to 'abdou' -- similarity=0.89 -- MATCH
+   glasscube.assistant.assistant INFO Answering question: 'what is IEEE INSAT?'
+   glasscube.assistant.assistant INFO Answer: '...'
    ```
    Plus:
    - Spoken reply through the speakers (Piper TTS), grounded in the seed
@@ -83,7 +83,7 @@ including the new assistant widget near the bottom-left with the prompt
 
 ## Reading the logs
 
-The mirror app (`smartmirror/app/main.py`) configures logging so `smartmirror.*` shows at INFO while noisy
+The mirror app (`glasscube/app/main.py`) configures logging so `glasscube.*` shows at INFO while noisy
 third-party libraries (httpx, sentence_transformers, ...) stay at WARNING.
 Four checkpoints to watch for on every turn, in order:
 
@@ -136,7 +136,7 @@ Two different failure classes, two different mitigations:
     so it's an unlikely culprit here -- but avoid turning it on in a
     long-running/Pi deployment.
   - Since a segfault can't be caught in-process, use
-    `backend/scripts/run_supervised.sh` instead of running `python -m smartmirror`
+    `backend/scripts/run_supervised.sh` instead of running `python -m glasscube`
     directly for anything long-running: it restarts on any crash
     (segfault included), logs every restart with a timestamp, and gives up
     loudly instead of restart-looping forever if crashes are frequent. On

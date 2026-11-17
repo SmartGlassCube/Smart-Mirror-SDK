@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from smartmirror.assistant.stt.wake_word import WAKE_WORD_VARIANTS, WakeWordDetector
+from glasscube.assistant.stt.wake_word import WAKE_WORD_VARIANTS, WakeWordDetector
 
 # The 8 real mishearings confirmed from base.en transcription logs (the b/d
 # plosives in "abdou" get dropped/softened, leaving the vowel skeleton).
@@ -178,7 +178,7 @@ def test_exact_variant_match_is_tried_before_fuzzy_and_logged_as_such(caplog):
     stt = FakeSTT(["up there what is IEEE INSAT"])
     detector = WakeWordDetector(stt=stt, vad_kwargs=VAD_KWARGS)
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.wake_word"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.wake_word"):
         detector.listen_for_wake_word(iter(_utterance_blocks()))
 
     assert any("[exact-variant]" in message and "MATCH" in message for message in caplog.messages)
@@ -189,7 +189,7 @@ def test_fuzzy_fallback_is_tagged_in_the_log_when_no_variant_matches(caplog):
     stt = FakeSTT(["Abdu, what is IEEE INSAT?"])
     detector = WakeWordDetector(stt=stt, vad_kwargs=VAD_KWARGS)
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.wake_word"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.wake_word"):
         detector.listen_for_wake_word(iter(_utterance_blocks()))
 
     assert any("[fuzzy]" in message and "MATCH" in message for message in caplog.messages)
@@ -221,7 +221,7 @@ def test_logs_a_successful_match_with_the_heard_text(caplog):
     stt = FakeSTT(["ABDOU what is IEEE INSAT"])
     detector = WakeWordDetector(stt=stt, vad_kwargs=VAD_KWARGS)
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.wake_word"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.wake_word"):
         detector.listen_for_wake_word(iter(_utterance_blocks()))
 
     assert any(
@@ -234,7 +234,7 @@ def test_logs_a_failed_match_with_the_heard_text_and_reason(caplog):
     detector = WakeWordDetector(stt=stt, vad_kwargs=VAD_KWARGS)
     blocks = _utterance_blocks() + _utterance_blocks()
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.stt.wake_word"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.stt.wake_word"):
         detector.listen_for_wake_word(iter(blocks))
 
     failed_match_logs = [m for m in caplog.messages if "turn on the lights" in m]

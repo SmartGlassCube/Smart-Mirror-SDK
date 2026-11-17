@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Process-level supervisor for the mirror app (python -m smartmirror).
+# Process-level supervisor for the mirror app (python -m glasscube).
 #
 # A segfault in a native library (whisper.cpp, mediapipe/XNNPACK,
 # PortAudio/ALSA -- all running concurrently under asyncio here) kills the
 # whole Python process outright. No in-process try/except can catch that --
-# see SmartMirrorServer.run() (smartmirror/server/app.py) and
+# see SmartMirrorServer.run() (glasscube/server/app.py) and
 # Assistant.listen_loop for what *is* catchable (ordinary exceptions).
 # This script is the mitigation for the rest: restart on any non-zero
 # exit, segfault included, and log every restart with a timestamp and exit
@@ -17,12 +17,12 @@
 # for dev, bring-up, or anywhere systemd isn't available.
 #
 # Usage: scripts/run_supervised.sh   (from backend/)
-# Log:   mirror_supervisor.log (override with SMARTMIRROR_SUPERVISOR_LOG)
+# Log:   mirror_supervisor.log (override with GLASSCUBE_SUPERVISOR_LOG)
 
 set -u
 cd "$(dirname "$0")/.."
 
-LOG_FILE="${SMARTMIRROR_SUPERVISOR_LOG:-mirror_supervisor.log}"
+LOG_FILE="${GLASSCUBE_SUPERVISOR_LOG:-mirror_supervisor.log}"
 MAX_RESTARTS_PER_MIN=6
 restart_times=()
 
@@ -32,7 +32,7 @@ log() {
 
 while true; do
     log "Starting the mirror app"
-    python3 -m smartmirror
+    python3 -m glasscube
     exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then

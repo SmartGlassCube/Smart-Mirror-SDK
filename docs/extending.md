@@ -1,6 +1,6 @@
 # Extending the Smart Mirror SDK
 
-Everything below plugs in from your own app code. None of it requires editing the SDK packages in `backend/smartmirror/`. The mirror app's own pages are in `backend/smartmirror/app/pages.py`: a good place to start.
+Everything below plugs in from your own app code. None of it requires editing the SDK packages in `backend/glasscube/`. The mirror app's own pages are in `backend/glasscube/app/pages.py`: a good place to start.
 
 | You want to add… | Python | Frontend |
 |---|---|---|
@@ -16,7 +16,7 @@ Everything below plugs in from your own app code. None of it requires editing th
 A gesture is a class whose `detect(context)` runs once per camera frame and returns the events it fired. Event names are plain strings, so a custom gesture doesn't need to edit `GestureType`.
 
 ```python
-from smartmirror.vision import Gesture, GestureEvent, SIDES
+from glasscube.vision import Gesture, GestureEvent, SIDES
 
 class FistGesture(Gesture):
     name = "fist"
@@ -40,7 +40,7 @@ class FistGesture(Gesture):
 Register it alongside the built-ins:
 
 ```python
-from smartmirror.vision import GestureDetector, default_gesture_set
+from glasscube.vision import GestureDetector, default_gesture_set
 
 detector = GestureDetector(gestures=default_gesture_set() + [FistGesture()])
 server = SmartMirrorServer(state_manager=state_manager, gesture_detector=detector)
@@ -51,7 +51,7 @@ server = SmartMirrorServer(state_manager=state_manager, gesture_detector=detecto
 - `context.signals`: shared per-frame features, computed once. The full table is in [vision.md](vision.md#signals).
 - `context.timestamp`: the frame time in seconds.
 
-**Base classes for common gesture shapes** (in `smartmirror.vision`):
+**Base classes for common gesture shapes** (in `glasscube.vision`):
 - `ContinuousGesture`: for start → update → end gestures. Call `self._phase(side, triggered, ended, (start, update, end), location, data)` once per hand per frame. `ScrollGesture` and `ZoomGesture` use it.
 - `PostureSwipeGesture`: a one-hand swipe while holding a posture. Implement `is_ready(context, side)` and `tracked_point(context, side)`, and set `directions = {"left": ..., "right": ..., "up": ..., "down": ...}`. `SwipeGesture` and `TwoFingersSwipeGesture` are about 20 lines each on top of it.
 
@@ -66,7 +66,7 @@ A widget has two halves that share one `type` string: a Python model (state + da
 ### Python model
 
 ```python
-from smartmirror.widgets import BaseWidget
+from glasscube.widgets import BaseWidget
 
 class ClockWidget(BaseWidget):
     type = "clock"          # must match the frontend folder's defineWidget('clock', ...)
@@ -157,7 +157,7 @@ Edges also accept `source`/`target` instead of `from`/`to`, and `trigger`/`event
    ```
    An action is a callable `(state_manager, event)`, a `StateManager` method name, or `{"target", "method", "kwargs"}`. Return `True` from it to broadcast the new state.
 2. **Graph edges** from the current page (section 3).
-3. **Widget events**: first `handle_gesture` on widgets that list the event in `gestures`, then the default bindings in `smartmirror/config/json_config/default_widget_event_bindings.json`:
+3. **Widget events**: first `handle_gesture` on widgets that list the event in `gestures`, then the default bindings in `glasscube/config/json_config/default_widget_event_bindings.json`:
 
    | Event | Handler | `target` |
    |---|---|---|

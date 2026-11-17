@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from smartmirror.content.cache import ContentCache
+from glasscube.content.cache import ContentCache
 
 
 def test_upsert_and_docs_roundtrip(tmp_path):

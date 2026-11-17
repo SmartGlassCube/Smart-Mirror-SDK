@@ -1,8 +1,8 @@
-from smartmirror.app.pages import build_graph
-from smartmirror.app.settings import Settings
-from smartmirror.core import StateManager
-from smartmirror.vision import GestureEvent
-from smartmirror.widgets import DrawingWidget
+from glasscube.app.pages import build_graph
+from glasscube.app.settings import Settings
+from glasscube.core import StateManager
+from glasscube.vision import GestureEvent
+from glasscube.widgets import DrawingWidget
 
 
 def event(name):

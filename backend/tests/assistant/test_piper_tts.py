@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from smartmirror.assistant.tts import PiperTTS
+from glasscube.assistant.tts import PiperTTS
 
 LOAD_PATH = "piper.PiperVoice.load"
 

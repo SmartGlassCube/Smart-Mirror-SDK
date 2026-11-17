@@ -8,14 +8,14 @@ __pycache__/
 .mypy_cache/
 
 # Build outputs: the prebuilt mirror UI (backend/scripts/build_frontend.py) and the dists
-backend/smartmirror/ui/
+backend/glasscube/ui/
 backend/dist/
 backend/build/
 
 # Secrets (copy backend/.env.example to backend/.env)
 .env
 
-# Runtime files: hand-tracking model, Qdrant store, content cache (see smartmirror/config/paths.py)
+# Runtime files: hand-tracking model, Qdrant store, content cache (see glasscube/config/paths.py)
 backend/.data/
 backend/mirror_supervisor.log
 

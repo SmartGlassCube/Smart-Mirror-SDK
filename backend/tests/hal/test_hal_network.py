@@ -4,7 +4,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import numpy as np
 import pytest
 
-from smartmirror.hal import HAL, is_stream_url
+from glasscube.hal import HAL, is_stream_url
 
 
 def serve_once(body):

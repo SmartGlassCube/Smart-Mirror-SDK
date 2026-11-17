@@ -1,7 +1,7 @@
 import asyncio
 
-from smartmirror.server.widget_data import refresh_widget_data
-from smartmirror.widgets import BaseWidget, CalendarWidget, EventsWidget, GamesWidget, TextWidget
+from glasscube.server.widget_data import refresh_widget_data
+from glasscube.widgets import BaseWidget, CalendarWidget, EventsWidget, GamesWidget, TextWidget
 
 
 def test_games_widget_serializes_games():

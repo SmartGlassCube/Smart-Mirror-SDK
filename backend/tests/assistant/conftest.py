@@ -2,8 +2,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from smartmirror.assistant.llm import LLMBackend
-from smartmirror.assistant.rag import SEED_CORPUS_DIR, Embedder
+from glasscube.assistant.llm import LLMBackend
+from glasscube.assistant.rag import SEED_CORPUS_DIR, Embedder
 
 
 @pytest.fixture(scope="session")

@@ -2,12 +2,12 @@
 """Standalone Mongo -> cache + Qdrant content sync, no camera/gestures/UI.
 
 Runs exactly what the mirror does for content on boot (ContentSync.reconcile()
-then .watch() + heartbeat, see smartmirror.content.sync), so that editing
+then .watch() + heartbeat, see glasscube.content.sync), so that editing
 content through the dashboard reaches the assistant's RAG and the cached
 widget data live -- without needing the full camera-driven mirror app
-(python -m smartmirror) running. Started/stopped by ./dev.sh up|down.
+(python -m glasscube) running. Started/stopped by ./dev.sh up|down.
 
-Started by ./dev.sh with SMARTMIRROR_MIRROR_ID=dev-content-sync (default
+Started by ./dev.sh with GLASSCUBE_MIRROR_ID=dev-content-sync (default
 "mirror-1" otherwise) so its mirror_status heartbeat doesn't look like a
 real mirror in the dashboard's status page.
 
@@ -25,12 +25,12 @@ import os
 import signal
 import threading
 
-from smartmirror.content import build_content_sync, enabled
+from glasscube.content import build_content_sync, enabled
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("content_sync_daemon")
 
-os.environ.setdefault("SMARTMIRROR_MIRROR_ID", "dev-content-sync")
+os.environ.setdefault("GLASSCUBE_MIRROR_ID", "dev-content-sync")
 
 
 async def main() -> None:

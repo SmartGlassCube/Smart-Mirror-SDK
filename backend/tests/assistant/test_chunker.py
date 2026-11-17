@@ -1,6 +1,6 @@
 import pytest
 
-from smartmirror.assistant.rag import Chunker
+from glasscube.assistant.rag import Chunker
 
 
 def test_load_single_txt_file(tmp_path):

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from smartmirror.content import routing
+from glasscube.content import routing
 
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 

@@ -16,10 +16,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from smartmirror.assistant import assistant as assistant_module
-from smartmirror.assistant import Assistant
-from smartmirror.assistant.llm import LLMBackend
-from smartmirror.assistant.rag import VectorStore
+from glasscube.assistant import assistant as assistant_module
+from glasscube.assistant import Assistant
+from glasscube.assistant.llm import LLMBackend
+from glasscube.assistant.rag import VectorStore
 
 
 @pytest.fixture
@@ -238,7 +238,7 @@ async def test_listen_loop_survives_a_bad_turn_and_keeps_listening(
         results.append(payload)
         raise _StopLoop
 
-    with caplog.at_level("ERROR", logger="smartmirror.assistant.assistant"):
+    with caplog.at_level("ERROR", logger="glasscube.assistant.assistant"):
         with pytest.raises(_StopLoop):
             await a.listen_loop(on_result=on_result)
 
@@ -427,7 +427,7 @@ async def test_wake_window_opens_after_a_match_and_skips_the_wake_word_on_the_ne
         if len(turns) >= 2:
             raise _StopLoop
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.assistant"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.assistant"):
         with pytest.raises(_StopLoop):
             await a.listen_loop(on_result=on_result)
 
@@ -462,7 +462,7 @@ async def test_wake_window_closes_after_inactivity_and_requires_wake_word_again(
         if len(wake_word_calls) >= 2:
             raise _StopLoop
 
-    with caplog.at_level("INFO", logger="smartmirror.assistant.assistant"):
+    with caplog.at_level("INFO", logger="glasscube.assistant.assistant"):
         with pytest.raises(_StopLoop):
             await a.listen_loop(on_result=on_result)
 
@@ -533,7 +533,7 @@ def test_tts_disabled_by_default_is_a_silent_no_op(isolated_vector_store, fake_b
 
 
 def test_backward_compat_api_key_kwarg_still_builds_an_openai_compat_backend(isolated_vector_store):
-    from smartmirror.assistant.llm import OpenAICompatBackend
+    from glasscube.assistant.llm import OpenAICompatBackend
 
     a = Assistant(api_key="sk-test", url="http://localhost:11434/v1", model="qwen2.5:0.5b")
 

@@ -10,8 +10,8 @@ npm run lint
 npm run build      # into dist/ (wipes it first)
 ```
 
-Point it at another backend port with `VITE_SMARTMIRROR_WS_PORT=8090 npm run dev`.
-`python -m smartmirror` (in `backend/`) starts the dev server for you and sets it.
+Point it at another backend port with `VITE_GLASSCUBE_WS_PORT=8090 npm run dev`.
+`python -m glasscube` (in `backend/`) starts the dev server for you and sets it.
 
 | Path | |
 |---|---|

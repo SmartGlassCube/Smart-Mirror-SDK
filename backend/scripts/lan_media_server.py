@@ -9,12 +9,12 @@ mirror's .env at it:
     uv run python scripts/lan_media_server.py --allow <mirror-ip>
 
     # the mirror's .env:
-    SMARTMIRROR_CAMERA=http://<this-machine-ip>:8081/camera
-    SMARTMIRROR_MIC=http://<this-machine-ip>:8081/mic
+    GLASSCUBE_CAMERA=http://<this-machine-ip>:8081/camera
+    GLASSCUBE_MIC=http://<this-machine-ip>:8081/mic
 
 /camera is an MJPEG stream (multipart/x-mixed-replace), which the mirror's
 cv2.VideoCapture(url) reads; /mic is raw mono int16 little-endian PCM at
-?rate= (default 16000), which smartmirror.hal.HAL reads for an http://
+?rate= (default 16000), which glasscube.hal.HAL reads for an http://
 input_device. The mirror flips and processes frames itself, so they're sent
 as the camera captures them.
 
@@ -33,8 +33,8 @@ from urllib.parse import parse_qs, urlparse
 
 import cv2
 
-from smartmirror.hal import HAL
-from smartmirror.hal.hal import DEFAULT_SAMPLERATE
+from glasscube.hal import HAL
+from glasscube.hal.hal import DEFAULT_SAMPLERATE
 
 BOUNDARY = "frame"
 JPEG_QUALITY = 80
@@ -157,8 +157,8 @@ def main():
     host = lan_ip(args.allow[0])
     print(f"lan_media_server: serving camera {args.camera} + mic to {', '.join(args.allow)}")
     print("Put this in the mirror's .env:")
-    print(f"  SMARTMIRROR_CAMERA=http://{host}:{args.port}/camera")
-    print(f"  SMARTMIRROR_MIC=http://{host}:{args.port}/mic")
+    print(f"  GLASSCUBE_CAMERA=http://{host}:{args.port}/camera")
+    print(f"  GLASSCUBE_MIC=http://{host}:{args.port}/mic")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

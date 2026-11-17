@@ -5,7 +5,7 @@ import urllib.request
 
 import websockets
 
-from smartmirror.server import SmartMirrorServer
+from glasscube.server import SmartMirrorServer
 
 
 def _ui(tmp_path):

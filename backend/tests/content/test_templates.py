@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from smartmirror.content import templates
+from glasscube.content import templates
 
 
 def test_render_event_excludes_internal_fields():

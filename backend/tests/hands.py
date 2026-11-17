@@ -1,6 +1,6 @@
 """Synthetic hands for camera-free tests."""
 
-from smartmirror.vision import SIDES, HandData
+from glasscube.vision import SIDES, HandData
 
 # finger -> (x offset, MCP, PIP, DIP, TIP landmark indices)
 _FINGERS = {

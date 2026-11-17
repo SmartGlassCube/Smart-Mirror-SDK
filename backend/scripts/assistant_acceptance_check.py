@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Phase 1 acceptance check for smartmirror.assistant.
+"""Phase 1 acceptance check for glasscube.assistant.
 
 Runs the whole walking skeleton against a real LLM backend: embeds and
 indexes the seed corpus into local on-disk Qdrant, retrieves context for a
@@ -12,42 +12,42 @@ so it can run without credentials or a live server).
 Backend is constructed explicitly, same as Assistant now expects:
 
     Usage (OpenAI-compatible -- OpenAI itself, Ollama, OpenRouter, vLLM, ...):
-        export SMARTMIRROR_LLM_API_KEY=sk-...          # any non-empty string for Ollama
-        export SMARTMIRROR_LLM_BASE_URL=http://localhost:11434/v1   # optional
-        export SMARTMIRROR_LLM_MODEL=qwen2.5:0.5b       # optional
+        export GLASSCUBE_LLM_API_KEY=sk-...          # any non-empty string for Ollama
+        export GLASSCUBE_LLM_BASE_URL=http://localhost:11434/v1   # optional
+        export GLASSCUBE_LLM_MODEL=qwen2.5:0.5b       # optional
         python scripts/assistant_acceptance_check.py
 
     Usage (Anthropic):
-        export SMARTMIRROR_LLM_PROVIDER=anthropic
-        export SMARTMIRROR_LLM_API_KEY=sk-ant-...
-        export SMARTMIRROR_LLM_MODEL=claude-sonnet-5    # optional
+        export GLASSCUBE_LLM_PROVIDER=anthropic
+        export GLASSCUBE_LLM_API_KEY=sk-ant-...
+        export GLASSCUBE_LLM_MODEL=claude-sonnet-5    # optional
         python scripts/assistant_acceptance_check.py
 """
 
 import os
 import sys
 
-from smartmirror.assistant import Assistant
-from smartmirror.assistant.llm import AnthropicBackend, OpenAICompatBackend
-from smartmirror.assistant.rag import SEED_CORPUS_DIR as SEED_CORPUS
+from glasscube.assistant import Assistant
+from glasscube.assistant.llm import AnthropicBackend, OpenAICompatBackend
+from glasscube.assistant.rag import SEED_CORPUS_DIR as SEED_CORPUS
 
 
 def build_backend():
-    api_key = os.getenv("SMARTMIRROR_LLM_API_KEY")
+    api_key = os.getenv("GLASSCUBE_LLM_API_KEY")
     if not api_key:
-        print("Set SMARTMIRROR_LLM_API_KEY to a real API key before running this check.", file=sys.stderr)
+        print("Set GLASSCUBE_LLM_API_KEY to a real API key before running this check.", file=sys.stderr)
         return None
 
-    provider = os.getenv("SMARTMIRROR_LLM_PROVIDER", "openai_compat")
+    provider = os.getenv("GLASSCUBE_LLM_PROVIDER", "openai_compat")
     if provider == "anthropic":
         return AnthropicBackend(
             api_key=api_key,
-            model=os.getenv("SMARTMIRROR_LLM_MODEL", "claude-sonnet-5"),
+            model=os.getenv("GLASSCUBE_LLM_MODEL", "claude-sonnet-5"),
         )
     return OpenAICompatBackend(
         api_key=api_key,
-        base_url=os.getenv("SMARTMIRROR_LLM_BASE_URL"),
-        model=os.getenv("SMARTMIRROR_LLM_MODEL", "gpt-4o-mini"),
+        base_url=os.getenv("GLASSCUBE_LLM_BASE_URL"),
+        model=os.getenv("GLASSCUBE_LLM_MODEL", "gpt-4o-mini"),
     )
 
 

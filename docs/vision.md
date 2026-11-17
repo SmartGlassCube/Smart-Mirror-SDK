@@ -1,6 +1,6 @@
 # Vision Module
 
-`backend/smartmirror/vision` turns camera frames into gesture events.
+`backend/glasscube/vision` turns camera frames into gesture events.
 
 ## Main flow
 

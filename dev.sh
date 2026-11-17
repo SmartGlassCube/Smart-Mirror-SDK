@@ -186,7 +186,7 @@ start_content_sync() {
   mkdir -p "$LOG_DIR" "$PID_DIR"
   (
     cd "$BACKEND"
-    SMARTMIRROR_MIRROR_ID="$CONTENT_SYNC_MIRROR_ID" \
+    GLASSCUBE_MIRROR_ID="$CONTENT_SYNC_MIRROR_ID" \
       nohup "$PYTHON" "$CONTENT_SYNC_SCRIPT" \
       >>"$LOG_DIR/content-sync.log" 2>&1 &
     echo $! >"$PID_DIR/content-sync.pid"
@@ -250,8 +250,8 @@ print('  last error: ', m.get('last_error') if m else None)
   fi
   echo
   local mirror_pid
-  mirror_pid="$(pgrep -f 'python.* -m smartmirror' | head -1 || true)"
-  echo "Mirror app (python -m smartmirror):"
+  mirror_pid="$(pgrep -f 'python.* -m glasscube' | head -1 || true)"
+  echo "Mirror app (python -m glasscube):"
   if [ -n "$mirror_pid" ]; then
     echo "  up (pid $mirror_pid)"
   else
@@ -276,7 +276,7 @@ cmd_mirror() {
     stop_proc "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" "content-sync"
   fi
   cd "$BACKEND"
-  exec uv run python -m smartmirror
+  exec uv run python -m glasscube
 }
 
 cmd_help() {
@@ -289,7 +289,7 @@ Usage: ./dev.sh <command>
   down      Stop it.
   status    Mongo reachable? + content-sync up/last-sync + mirror app up?
   logs      Tail the content-sync daemon's log.
-  mirror    Run the full camera-driven mirror app (python -m smartmirror,
+  mirror    Run the full camera-driven mirror app (python -m glasscube,
             frontend included) with MONGO_URI from backend/.env. Stops the
             content-sync daemon first (see
             note below); `up` brings it back afterward.

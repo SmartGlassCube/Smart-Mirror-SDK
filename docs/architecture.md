@@ -36,10 +36,10 @@ Smart-Mirror-SDK/
 ├── backend/                       # Python: the SDK + the mirror app
 │   ├── pyproject.toml, uv.lock
 │   ├── .env.example               # every setting; copy to backend/.env
-│   ├── smartmirror/               # the package
-│   │   ├── app/                   # the mirror app (`python -m smartmirror`)
+│   ├── glasscube/               # the package
+│   │   ├── app/                   # the mirror app (`python -m glasscube`)
 │   │   │   ├── main.py            # builds content sync, assistant, pages, server; runs them
-│   │   │   ├── settings.py        # Settings.from_env(): every SMARTMIRROR_* / MONGO_URI variable
+│   │   │   ├── settings.py        # Settings.from_env(): every GLASSCUBE_* / MONGO_URI variable
 │   │   │   ├── pages.py           # the widgets and the page graph (draw <-> games <-> home <-> events)
 │   │   │   └── frontend_dev.py    # FrontendLauncher: npm install + Vite dev server (dev convenience)
 │   │   ├── server/                # SmartMirrorServer and what it runs
@@ -48,7 +48,7 @@ Smart-Mirror-SDK/
 │   │   │   ├── websocket.py       # ClientHub: connected clients, INIT + broadcasts
 │   │   │   ├── camera_preview.py  # CameraPreview: small annotated webcam frame + latest gestures
 │   │   │   ├── hand_pointer.py    # HandPointer: fingertip position for the frontend's cursor
-│   │   │   ├── static_ui.py       # Serves the prebuilt UI (smartmirror/ui/, pip installs) on the WS port
+│   │   │   ├── static_ui.py       # Serves the prebuilt UI (glasscube/ui/, pip installs) on the WS port
 │   │   │   └── widget_data.py     # Calls widget data providers on their refresh interval
 │   │   ├── vision/                # Hand tracking + gestures (see vision.md)
 │   │   │   ├── landmark_detector.py  gesture_detector.py  hand_data.py  gesture_types.py  debug_overlay.py
@@ -81,7 +81,7 @@ Smart-Mirror-SDK/
 
 Runtime files (the downloaded hand-tracking model, the embedded Qdrant store, the
 content cache) go in `backend/.data/` in a checkout, or the user data folder once
-pip-installed (`SMARTMIRROR_DATA_DIR` to move them), never in the source tree.
+pip-installed (`GLASSCUBE_DATA_DIR` to move them), never in the source tree.
 
 ---
 
@@ -103,15 +103,15 @@ Whisper, Piper). The MediaPipe model is downloaded into `backend/.data/models/` 
 
 ```bash
 cd backend
-uv run python -m smartmirror
+uv run python -m glasscube
 ```
 
 This does the following:
-- Starts the WebSocket server on `ws://localhost:8080` (`SMARTMIRROR_WS_PORT`).
+- Starts the WebSocket server on `ws://localhost:8080` (`GLASSCUBE_WS_PORT`).
 - Runs `npm install` (first time only) and `npm run dev` inside `frontend/`, which serves
-  the UI at `http://localhost:5173` (`SMARTMIRROR_FRONTEND_PORT`). Node/npm must be on
-  your PATH. Set `SMARTMIRROR_FRONTEND=0` to start the frontend yourself instead.
-- Opens the default camera (`SMARTMIRROR_CAMERA`: an index or a LAN stream URL). If
+  the UI at `http://localhost:5173` (`GLASSCUBE_FRONTEND_PORT`). Node/npm must be on
+  your PATH. Set `GLASSCUBE_FRONTEND=0` to start the frontend yourself instead.
+- Opens the default camera (`GLASSCUBE_CAMERA`: an index or a LAN stream URL). If
   no camera is available, it falls back to a data-only mode.
 
 Without `MONGO_URI`, the calendar, news and events widgets show placeholders and the
@@ -128,7 +128,7 @@ This opens an annotated camera window showing bounding boxes, pointer trails, pi
 
 ---
 
-## 4. Computer vision pipeline (`smartmirror/vision`)
+## 4. Computer vision pipeline (`glasscube/vision`)
 
 ### 4.1 LandmarkDetector
 - Wraps the MediaPipe Tasks `HandLandmarker` in `VIDEO` mode and tracks up to 2 hands.
@@ -173,7 +173,7 @@ To add a gesture from your own code (no enum edit needed), see [extending.md](ex
 
 ---
 
-## 5. State & navigation (`smartmirror/core/`)
+## 5. State & navigation (`glasscube/core/`)
 
 ### 5.1 The page graph
 An app is described as a graph. Nodes are pages holding widgets, and edges are gesture-triggered transitions:
@@ -227,7 +227,7 @@ Override any of these through `StateManager(gesture_config={...})`. Widget bindi
 
 ## 6. Widgets & data
 
-### 6.1 Python widget models (`smartmirror/widgets`)
+### 6.1 Python widget models (`glasscube/widgets`)
 Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` (plus optional `refresh_interval` and `gestures` class attributes). Constructor fields:
 - `position` (`{"x": 0–1, "y": 0–1}`, a fraction of the screen)
 - `content`, `data`, `metadata`
@@ -248,7 +248,7 @@ Every widget extends `BaseWidget`. A widget type is a subclass that sets `type` 
 | `DrawingWidget` | `drawing` | Canvas drawn on by pinching; the frontend draws from `POINTER` messages. `left_click` changes colour, open-hand `swipe_left`/`swipe_right` (hand toward screen-right/left) make the brush bigger/smaller, `swipe_up` or `two_fingers_swipe_up` clears. `data = {color, size, clears}` |
 | `NewsWidget` | `news` | Announcements/achievements (`data = {"items": [...]}`) or placeholder `content` |
 
-### 6.2 Data providers (`smartmirror/widgets/providers`)
+### 6.2 Data providers (`glasscube/widgets/providers`)
 A data provider is any callable, sync or async, with the signature `provider(widget)` or `provider()`. The server calls it every `refresh_interval` seconds and stores the result in `widget.data`. Built-in providers:
 - `MongoCalendarProvider(uri, database, collection, query, ...)` returns `{"events": [...]}`, with datetimes converted to ISO strings.
 - `QRCodeCatalogProvider(categories)` returns `{"categories": ...}`.
@@ -273,7 +273,7 @@ through `GestureDetector.process_hands(..., timestamp=...)`.
 - The assistant tests load the sentence-transformers model once per session (slow on the first run).
 - The content tests that need a real Mongo read `MONGO_URI` and skip without one
   (`../Dashboard/dev.sh up` starts it).
-- Tests write their Qdrant stores to a temporary `SMARTMIRROR_DATA_DIR`, never to `backend/.data`.
+- Tests write their Qdrant stores to a temporary `GLASSCUBE_DATA_DIR`, never to `backend/.data`.
 
 To check gestures live on a camera, use `examples/gesture_detector_debug.py`.
 
@@ -300,9 +300,9 @@ To check gestures live on a camera, use `examples/gesture_detector_debug.py`.
 
 ```python
 import asyncio
-from smartmirror.server import SmartMirrorServer
-from smartmirror.core import StateManager
-from smartmirror.widgets import TextWidget
+from glasscube.server import SmartMirrorServer
+from glasscube.core import StateManager
+from glasscube.widgets import TextWidget
 
 home = TextWidget(position={"x": 0.5, "y": 0.5},
                   content={"tips": ["Swipe to cycle", "Scroll for sections"],

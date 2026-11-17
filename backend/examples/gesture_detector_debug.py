@@ -2,7 +2,7 @@
 
 import cv2
 
-from smartmirror.vision import (
+from glasscube.vision import (
     ClickGesture,
     GestureDetector,
     PinchGesture,

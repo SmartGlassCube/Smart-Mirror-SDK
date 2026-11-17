@@ -23,12 +23,12 @@ import wave
 import numpy as np
 
 logging.basicConfig(level=logging.WARNING, format="%(name)s %(levelname)s %(message)s")
-logging.getLogger("smartmirror").setLevel(logging.INFO)
+logging.getLogger("glasscube").setLevel(logging.INFO)
 
-from smartmirror.assistant import Assistant
-from smartmirror.assistant.llm import OpenAICompatBackend
-from smartmirror.assistant.rag import SEED_CORPUS_DIR as SEED_CORPUS
-from smartmirror.assistant.tts import DEFAULT_VOICE, DEFAULT_VOICES_DIR
+from glasscube.assistant import Assistant
+from glasscube.assistant.llm import OpenAICompatBackend
+from glasscube.assistant.rag import SEED_CORPUS_DIR as SEED_CORPUS
+from glasscube.assistant.tts import DEFAULT_VOICE, DEFAULT_VOICES_DIR
 
 PHRASE = "ABDOU, what is IEEE INSAT?"
 BLOCKSIZE = 1600  # 100ms @ 16kHz, matches HAL's default
@@ -82,9 +82,9 @@ class SyntheticHAL:
 
 
 def main():
-    api_key = os.getenv("SMARTMIRROR_LLM_API_KEY", "ollama")
-    base_url = os.getenv("SMARTMIRROR_LLM_BASE_URL", "http://localhost:11434/v1")
-    model = os.getenv("SMARTMIRROR_LLM_MODEL", "qwen2.5:0.5b")
+    api_key = os.getenv("GLASSCUBE_LLM_API_KEY", "ollama")
+    base_url = os.getenv("GLASSCUBE_LLM_BASE_URL", "http://localhost:11434/v1")
+    model = os.getenv("GLASSCUBE_LLM_MODEL", "qwen2.5:0.5b")
 
     print(f"Synthesizing: {PHRASE!r}")
     samples, samplerate = synthesize_phrase()

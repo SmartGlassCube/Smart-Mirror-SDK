@@ -3,8 +3,8 @@ requires = ["setuptools>=77.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "smartmirror"
-dynamic = ["version"]  # smartmirror/__init__.py: __version__
+name = "glasscube"
+dynamic = ["version"]  # glasscube/__init__.py: __version__
 description = "Build gesture-controlled smart mirrors: webcam hand gestures drive pages and widgets of a React UI, plus a voice assistant"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -44,7 +44,7 @@ Repository = "https://github.com/SmartGlassCube/Smart-Mirror-SDK"
 Issues = "https://github.com/SmartGlassCube/Smart-Mirror-SDK/issues"
 
 [project.scripts]
-smartmirror = "smartmirror.app.main:main"
+glasscube = "glasscube.app.main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -83,14 +83,14 @@ dev = [
 ]
 
 [tool.setuptools.dynamic]
-version = { attr = "smartmirror.__version__" }
+version = { attr = "glasscube.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["smartmirror*"]
+include = ["glasscube*"]
 
 [tool.setuptools.package-data]
-smartmirror = [
+glasscube = [
   "config/json_config/*.json",
   "assistant/rag/seed_corpus/*",
   # The prebuilt UI: scripts/build_frontend.py, run before building the package

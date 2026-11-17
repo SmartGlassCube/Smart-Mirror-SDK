@@ -1,4 +1,4 @@
-from smartmirror.assistant.rag import Chunker, Retriever, VectorStore
+from glasscube.assistant.rag import Chunker, Retriever, VectorStore
 
 
 def test_retrieve_returns_relevant_chunk_texts(tmp_path, embedder, seed_corpus_path):

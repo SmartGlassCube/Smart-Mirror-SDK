@@ -1,5 +1,5 @@
-from smartmirror.core import StateManager
-from smartmirror.vision import (
+from glasscube.core import StateManager
+from glasscube.vision import (
     Gesture,
     GestureDetector,
     GestureEvent,
@@ -8,7 +8,7 @@ from smartmirror.vision import (
     TwoFingersSwipeGesture,
     default_gesture_set,
 )
-from smartmirror.widgets import TextWidget
+from glasscube.widgets import TextWidget
 from tests.hands import hands, make_hand
 
 

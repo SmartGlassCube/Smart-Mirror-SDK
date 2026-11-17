@@ -3,8 +3,8 @@ import io
 import json
 import urllib.parse
 
-from smartmirror.widgets.providers import OpenMeteoWeatherProvider
-from smartmirror.widgets.providers import open_meteo
+from glasscube.widgets.providers import OpenMeteoWeatherProvider
+from glasscube.widgets.providers import open_meteo
 
 
 def test_open_meteo_maps_current_weather(monkeypatch):

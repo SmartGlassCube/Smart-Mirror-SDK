@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from smartmirror.assistant.llm import OpenAICompatBackend
+from glasscube.assistant.llm import OpenAICompatBackend
 
 
 def test_complete_returns_reply_text(fake_llm_response):

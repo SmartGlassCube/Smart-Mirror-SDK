@@ -1,5 +1,5 @@
-from smartmirror.server.hand_pointer import HandPointer
-from smartmirror.vision import GestureDetector
+from glasscube.server.hand_pointer import HandPointer
+from glasscube.vision import GestureDetector
 from tests.hands import hands, make_hand
 
 

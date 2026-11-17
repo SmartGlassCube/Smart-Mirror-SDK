@@ -1,6 +1,6 @@
 import asyncio
 
-from smartmirror.server import SmartMirrorServer
+from glasscube.server import SmartMirrorServer
 
 
 def test_widgets_keep_refreshing_while_the_camera_loop_is_stuck(monkeypatch):
@@ -40,7 +40,7 @@ def test_a_crashing_camera_loop_is_logged_and_widgets_carry_on(monkeypatch, capl
 
     monkeypatch.setattr(server, "_main_loop", crashing_camera_loop)
     monkeypatch.setattr(server, "_refresh_widget_data", refresh_widget_data)
-    with caplog.at_level("ERROR", logger="smartmirror.server.app"):
+    with caplog.at_level("ERROR", logger="glasscube.server.app"):
         asyncio.run(asyncio.wait_for(server.run(), timeout=5))
 
     assert len(refreshes) == 3
