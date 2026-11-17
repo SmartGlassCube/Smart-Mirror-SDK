@@ -34,6 +34,8 @@ class SmartMirrorServer:
     Pass a `gesture_detector` to customise the gesture set.
     Pass an `assistant` built with `stt=True` to run the voice chatbot alongside,
     shown by the Abdo avatar in the frontend.
+    Pass `widget_types` (`[{"type", "name", "code"}]`, e.g. a studio project's) to send custom
+    React widgets to the frontend, which loads them at runtime (see docs/protocol.md).
 
     The frontend is a separate app that connects to `ws://<ws_host>:<ws_port>`
     (see docs/protocol.md). An installed package also carries a prebuilt copy of it,
@@ -58,6 +60,7 @@ class SmartMirrorServer:
         content_sync=None,
         widget_update_tick=0.5,
         serve_ui=True,
+        widget_types=None,
     ):
         if state_manager is None:
             state_manager = StateManager(graph=graph)
@@ -89,7 +92,7 @@ class SmartMirrorServer:
         self.widget_update_tick = widget_update_tick
         # The prebuilt UI (glasscube/ui/), when this install has one.
         self.ui_dir = bundled_ui_dir() if serve_ui else None
-        self.hub = ClientHub(state_manager)
+        self.hub = ClientHub(state_manager, widget_types=widget_types)
         self.running = False
 
     async def run(self):

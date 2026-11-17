@@ -14,8 +14,13 @@ The two halves share no code: they talk only over the WebSocket described in [do
 
 ```bash
 pip install glasscube        # or "glasscube[assistant]" for the voice assistant
-glasscube                    # then open http://localhost:8080
+glasscube                    # the demo mirror; then open http://localhost:8080
+glasscube run my-mirror.glasscube.json   # a mirror designed in Smart Mirror Studio
 ```
+
+[Smart Mirror Studio](https://github.com/SmartGlassCube/mirror-studio) designs mirrors without
+code (pages, widgets, gestures, custom widgets) and exports the files `glasscube run` takes.
+The IEEE INSAT club's own mirror (content synced from MongoDB) is `glasscube club`.
 
 The package ships a prebuilt copy of the UI, so it needs no Node. See [backend/README.md](backend/README.md)
 (also the PyPI page) for building your own mirror. Releases: push a `vX.Y.Z` tag matching
@@ -28,7 +33,7 @@ Needs [uv](https://docs.astral.sh/uv/), Node/npm and a webcam.
 ```bash
 cd backend
 uv sync --extra data --extra assistant   # first time: creates backend/.venv (pulls in torch)
-uv run python -m glasscube               # backend on :8080, also starts the frontend on :5173
+uv run python -m glasscube               # demo on :8080, also starts the frontend on :5173 (club: `... glasscube club`)
 ```
 
 Tests: `cd backend && uv run pytest`. Settings: copy `backend/.env.example` to `backend/.env`.

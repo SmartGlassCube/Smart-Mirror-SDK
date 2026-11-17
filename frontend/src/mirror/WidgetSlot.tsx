@@ -1,10 +1,30 @@
-import type { CSSProperties } from 'react'
+import { Component, type CSSProperties, type ReactNode } from 'react'
 import type { MirrorWidget } from '../types/mirror'
 import { widgetRegistry } from '../widgets/registry'
 import DragHandle from './DragHandle'
 
 type WidgetSlotProps = {
   widget: MirrorWidget
+}
+
+// A widget that throws (custom code, or bad data) shows its error instead of blanking the mirror.
+class WidgetBoundary extends Component<{ children: ReactNode; type: string }, { error: string | null }> {
+  state = { error: null as string | null }
+  static getDerivedStateFromError(error: Error) {
+    return { error: error.message }
+  }
+  componentDidCatch(error: Error) {
+    console.error(`[widgets] "${this.props.type}" crashed:`, error)
+  }
+  render() {
+    if (this.state.error === null) return this.props.children
+    return (
+      <div className="widget">
+        <h2>{this.props.type}</h2>
+        <div>{this.state.error}</div>
+      </div>
+    )
+  }
 }
 
 // Places one widget on the mirror; position x/y are 0..1 fractions of the screen.
@@ -23,7 +43,9 @@ function WidgetSlot({ widget }: WidgetSlotProps) {
   return (
     <div className={`widget-slot${widget.dragging ? ' widget-slot--dragging' : ''}`} style={style}>
       {widget.draggable !== false ? <DragHandle lit={Boolean(widget.dragging)} /> : null}
-      <Widget widget={widget} />
+      <WidgetBoundary type={widget.type}>
+        <Widget widget={widget} />
+      </WidgetBoundary>
     </div>
   )
 }

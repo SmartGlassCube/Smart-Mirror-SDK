@@ -276,7 +276,7 @@ cmd_mirror() {
     stop_proc "$PID_DIR/content-sync.pid" "$(content_sync_pattern)" "content-sync"
   fi
   cd "$BACKEND"
-  exec uv run python -m glasscube
+  exec uv run python -m glasscube club
 }
 
 cmd_help() {
@@ -289,7 +289,7 @@ Usage: ./dev.sh <command>
   down      Stop it.
   status    Mongo reachable? + content-sync up/last-sync + mirror app up?
   logs      Tail the content-sync daemon's log.
-  mirror    Run the full camera-driven mirror app (python -m glasscube,
+  mirror    Run the full camera-driven mirror app (python -m glasscube club,
             frontend included) with MONGO_URI from backend/.env. Stops the
             content-sync daemon first (see
             note below); `up` brings it back afterward.

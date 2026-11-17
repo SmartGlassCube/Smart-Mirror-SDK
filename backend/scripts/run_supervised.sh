@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Process-level supervisor for the mirror app (python -m glasscube).
+# Process-level supervisor for the mirror app (python -m glasscube club).
 #
 # A segfault in a native library (whisper.cpp, mediapipe/XNNPACK,
 # PortAudio/ALSA -- all running concurrently under asyncio here) kills the
@@ -32,7 +32,7 @@ log() {
 
 while true; do
     log "Starting the mirror app"
-    python3 -m glasscube
+    python3 -m glasscube club
     exit_code=$?
 
     if [ "$exit_code" -eq 0 ]; then

@@ -1,0 +1,282 @@
+{
+  "format": "glasscube-project",
+  "version": 1,
+  "name": "Demo mirror",
+  "updatedAt": "2026-11-17T08:12:32.467Z",
+  "settings": {
+    "initialPage": "home",
+    "screen": {
+      "width": 1080,
+      "height": 1920
+    },
+    "gestureConfig": {
+      "target_radius": 0.35,
+      "swipe_cooldown": 0.3,
+      "scroll_cooldown": 0.25,
+      "node_navigation_cooldown": 0.8,
+      "scroll_velocity_threshold": 0.03,
+      "allow_unmatched_single_edge_navigation": false
+    }
+  },
+  "pages": [
+    {
+      "id": "home",
+      "name": "Home",
+      "canvas": {
+        "x": 0,
+        "y": 0
+      },
+      "widgets": [
+        {
+          "id": "clock-i4brme",
+          "type": "clock",
+          "position": {
+            "x": 0.5,
+            "y": 0.12
+          },
+          "content": null,
+          "props": {
+            "showSeconds": true
+          },
+          "data": {
+            "kind": "clock",
+            "hour12": false
+          },
+          "refreshInterval": 1,
+          "draggable": true
+        },
+        {
+          "id": "weather-qyb569",
+          "type": "weather",
+          "position": {
+            "x": 0.25,
+            "y": 0.36
+          },
+          "content": null,
+          "props": {},
+          "data": {
+            "kind": "weather",
+            "city": "Paris",
+            "latitude": 48.8566,
+            "longitude": 2.3522
+          },
+          "refreshInterval": 600,
+          "draggable": true
+        },
+        {
+          "id": "greeting-27xbo1",
+          "type": "greeting",
+          "position": {
+            "x": 0.72,
+            "y": 0.36
+          },
+          "content": null,
+          "props": {
+            "name": "maker"
+          },
+          "data": {
+            "kind": "clock",
+            "hour12": false
+          },
+          "refreshInterval": 60,
+          "draggable": true
+        },
+        {
+          "id": "text-bfdkp3",
+          "type": "text",
+          "position": {
+            "x": 0.5,
+            "y": 0.62
+          },
+          "content": {
+            "tips": [
+              "Two fingers → swipe: agenda",
+              "Two fingers ← swipe: drawing",
+              "Open hand swipe: next tip"
+            ],
+            "about": [
+              "Built in Smart Mirror Studio",
+              "Runs on the glasscube SDK"
+            ]
+          },
+          "props": {},
+          "data": {
+            "kind": "none"
+          },
+          "refreshInterval": 300,
+          "draggable": true
+        }
+      ]
+    },
+    {
+      "id": "agenda",
+      "name": "Agenda",
+      "canvas": {
+        "x": 420,
+        "y": -120
+      },
+      "widgets": [
+        {
+          "id": "calendar-nm99n1",
+          "type": "calendar",
+          "position": {
+            "x": 0.5,
+            "y": 0.25
+          },
+          "content": "Upcoming",
+          "props": {},
+          "data": {
+            "kind": "static",
+            "value": {
+              "events": [
+                {
+                  "title": "Standup",
+                  "start": "2026-11-17T09:00:00"
+                },
+                {
+                  "title": "Demo day",
+                  "start": "2026-11-19T14:00:00"
+                },
+                {
+                  "title": "Workshop",
+                  "start": "2026-11-22T18:00:00"
+                }
+              ]
+            }
+          },
+          "refreshInterval": 60,
+          "draggable": true
+        },
+        {
+          "id": "news-nygrrh",
+          "type": "news",
+          "position": {
+            "x": 0.5,
+            "y": 0.62
+          },
+          "content": null,
+          "props": {},
+          "data": {
+            "kind": "static",
+            "value": {
+              "items": [
+                {
+                  "id": "1",
+                  "kind": "announcement",
+                  "title": "Welcome",
+                  "body": "This mirror was built without code."
+                },
+                {
+                  "id": "2",
+                  "kind": "achievement",
+                  "title": "New record",
+                  "body": "The team shipped version 0.1.0."
+                }
+              ]
+            }
+          },
+          "refreshInterval": 30,
+          "draggable": true
+        }
+      ]
+    },
+    {
+      "id": "draw",
+      "name": "Drawing",
+      "canvas": {
+        "x": 420,
+        "y": 200
+      },
+      "widgets": [
+        {
+          "id": "drawing-3yyms9",
+          "type": "drawing",
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "content": null,
+          "props": {},
+          "data": {
+            "kind": "static",
+            "value": {
+              "color": "#d5d5d5",
+              "size": 1,
+              "clears": 0
+            }
+          },
+          "refreshInterval": 300,
+          "draggable": false
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-home-agenda",
+      "from": "home",
+      "to": "agenda",
+      "gesture": "two_fingers_swipe_right"
+    },
+    {
+      "id": "e-agenda-home",
+      "from": "agenda",
+      "to": "home",
+      "gesture": "two_fingers_swipe_left"
+    },
+    {
+      "id": "e-home-draw",
+      "from": "home",
+      "to": "draw",
+      "gesture": "two_fingers_swipe_left"
+    },
+    {
+      "id": "e-draw-home",
+      "from": "draw",
+      "to": "home",
+      "gesture": "two_fingers_swipe_right"
+    }
+  ],
+  "bindings": [
+    {
+      "id": "b-home",
+      "gesture": "right_click",
+      "action": {
+        "kind": "goto",
+        "page": "home"
+      }
+    }
+  ],
+  "widgetTypes": [
+    {
+      "type": "clock",
+      "name": "Clock",
+      "description": "Big pixel clock with the date, from the clock data source.",
+      "source": "type ClockData = { time: string; seconds: string; date: string }\n\nexport default function Widget({ widget }) {\n  const data: ClockData | null = widget.data\n  const showSeconds = widget.metadata?.showSeconds !== false\n\n  return (\n    <div className=\"widget\" style={{ textAlign: 'center' }}>\n      <div style={{ fontFamily: 'var(--font-pixel-title)', fontSize: 'calc(var(--u) * 44)', color: 'var(--px-orange)' }}>\n        {data?.time ?? '--:--'}\n        {showSeconds ? <span style={{ fontSize: '0.45em', color: 'var(--px-silver)' }}>:{data?.seconds ?? '--'}</span> : null}\n      </div>\n      <div style={{ marginTop: 'calc(var(--px) * 2)' }}>{data?.date ?? ''}</div>\n    </div>\n  )\n}\n",
+      "origin": "template",
+      "defaultData": {
+        "kind": "clock",
+        "hour12": false
+      },
+      "defaultProps": {
+        "showSeconds": true
+      },
+      "compiled": "\"use strict\";Object.defineProperty(exports, \"__esModule\", {value: true}); function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }\n\n function Widget({ widget }) {\n  const data = widget.data\n  const showSeconds = _optionalChain([widget, 'access', _ => _.metadata, 'optionalAccess', _2 => _2.showSeconds]) !== false\n\n  return (\n    React.createElement('div', { className: \"widget\", style: { textAlign: 'center' },}\n      , React.createElement('div', { style: { fontFamily: 'var(--font-pixel-title)', fontSize: 'calc(var(--u) * 44)', color: 'var(--px-orange)' },}\n        , _nullishCoalesce(_optionalChain([data, 'optionalAccess', _3 => _3.time]), () => ( '--:--'))\n        , showSeconds ? React.createElement('span', { style: { fontSize: '0.45em', color: 'var(--px-silver)' },}, \":\", _nullishCoalesce(_optionalChain([data, 'optionalAccess', _4 => _4.seconds]), () => ( '--'))) : null\n      )\n      , React.createElement('div', { style: { marginTop: 'calc(var(--px) * 2)' },}, _nullishCoalesce(_optionalChain([data, 'optionalAccess', _5 => _5.date]), () => ( '')))\n    )\n  )\n} exports.default = Widget;\n"
+    },
+    {
+      "type": "greeting",
+      "name": "Greeting",
+      "description": "Good morning / afternoon / evening, with a name.",
+      "source": "export default function Widget({ widget }) {\n  const hour = new Date().getHours()\n  const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'\n\n  return (\n    <div className=\"widget\">\n      <div style={{ fontFamily: 'var(--font-pixel-title)', fontSize: 'calc(var(--u) * 18)', color: 'var(--px-orange)', lineHeight: 1.5 }}>\n        Good {part},<br />{widget.metadata?.name ?? 'friend'}!\n      </div>\n    </div>\n  )\n}\n",
+      "origin": "template",
+      "defaultData": {
+        "kind": "clock",
+        "hour12": false
+      },
+      "defaultProps": {
+        "name": "friend"
+      },
+      "compiled": "\"use strict\";Object.defineProperty(exports, \"__esModule\", {value: true}); function _nullishCoalesce(lhs, rhsFn) { if (lhs != null) { return lhs; } else { return rhsFn(); } } function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; } function Widget({ widget }) {\n  const hour = new Date().getHours()\n  const part = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'\n\n  return (\n    React.createElement('div', { className: \"widget\",}\n      , React.createElement('div', { style: { fontFamily: 'var(--font-pixel-title)', fontSize: 'calc(var(--u) * 18)', color: 'var(--px-orange)', lineHeight: 1.5 },}, \"Good \"\n         , part, \",\", React.createElement('br', null ), _nullishCoalesce(_optionalChain([widget, 'access', _ => _.metadata, 'optionalAccess', _2 => _2.name]), () => ( 'friend')), \"!\"\n      )\n    )\n  )\n} exports.default = Widget;\n"
+    }
+  ]
+}

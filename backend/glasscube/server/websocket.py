@@ -10,6 +10,8 @@ class ClientHub:
     """Tracks connected frontend clients and pushes messages to them.
 
     Protocol (server -> client):
+      - `{"type": "WIDGET_TYPES", "widgetTypes": [{"type", "name", "code"}]}`: custom widgets
+        (compiled React components, e.g. from a studio project), sent before INIT when there are any
       - `{"type": "INIT" | "STATE_UPDATE", "state": StateManager.get_state_snapshot()}`
       - `{"type": "CAMERA_FRAME", "image": "data:image/jpeg;base64,...", "events": [{"name", "hand"}]}`
         (small annotated webcam preview + latest gestures, see `CameraPreview`)
@@ -24,8 +26,9 @@ class ClientHub:
     Client messages are only logged for now. Full protocol: docs/protocol.md.
     """
 
-    def __init__(self, state_manager):
+    def __init__(self, state_manager, widget_types=None):
         self.state_manager = state_manager
+        self.widget_types = list(widget_types or [])
         self.clients = set()
 
     def state_message(self, message_type="STATE_UPDATE"):
@@ -44,6 +47,8 @@ class ClientHub:
         logger.info("Client %s connected. Total: %d", client_id, len(self.clients))
 
         try:
+            if self.widget_types:
+                await websocket.send(json.dumps({"type": "WIDGET_TYPES", "widgetTypes": self.widget_types}))
             await websocket.send(json.dumps(self.state_message("INIT")))
             async for message in websocket:
                 logger.info("Received from %s: %s", client_id, message)

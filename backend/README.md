@@ -28,6 +28,28 @@ Then open <http://localhost:8080> (full screen it on the mirror's display). Rais
 in front of the camera: the cursor follows your index finger, a two-finger swipe changes
 page, a pinch grabs and moves a widget. Without a camera it still starts, with no gestures.
 
+## Run a mirror designed without code
+
+Design the pages, widgets and gestures in
+[Smart Mirror Studio](https://github.com/SmartGlassCube/mirror-studio) (in the browser, with
+webcam testing), export the project, then:
+
+```bash
+glasscube run my-mirror.glasscube.json      # or .yaml
+```
+
+Custom widgets written in the studio (by hand, from a template, or by its AI assistant) run
+on the mirror as they did in the studio. Options for every command: `--port 8080`,
+`--camera 1` (or a `scripts/lan_media_server.py` URL), `--no-assistant`. From Python:
+
+```python
+from glasscube.project import load_project
+from glasscube.server import SmartMirrorServer
+
+project = load_project("my-mirror.glasscube.json")
+server = SmartMirrorServer(state_manager=project.state_manager(), widget_types=project.widget_types)
+```
+
 The voice assistant runs when the `assistant` extra is installed. It uses
 [Ollama](https://ollama.com) by default (`ollama pull qwen2.5:0.5b`, then `ollama serve`);
 point it at any OpenAI-compatible endpoint with `GLASSCUBE_LLM_BASE_URL`,
@@ -141,7 +163,8 @@ uv run python scripts/build_frontend.py  # bundle the UI into glasscube/ui/ befo
 
 | Path | |
 |---|---|
-| `glasscube/app/` | The demo mirror app: `settings.py` (env vars), `pages.py` (widgets + page graph), `main.py` |
+| `glasscube/app/` | The `glasscube` command (`main.py`): the demo (`demo.glasscube.json`), `run`, and the club's mirror (`pages.py`); `settings.py` (env vars) |
+| `glasscube/project.py` | Loads Smart Mirror Studio projects into a `StateManager` |
 | `glasscube/server/` | `SmartMirrorServer`: WebSocket, camera loop, widget refresh, assistant hooks, the bundled UI |
 | `glasscube/{vision,core,widgets,assistant,content,hal,config}/` | The SDK pieces, usable on their own |
 | `tests/` | One folder per package |

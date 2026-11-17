@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react'
 import Abdo, { type AbdoHandle } from '../assistant/Abdo'
 import { publishPointer } from '../services/pointer'
 import { useWebSocket } from '../services/useWebSocket'
+import { registerCustomWidgets } from '../widgets/customWidgets'
 import type { BackendMessage, CameraFrame, MirrorState } from '../types/mirror'
 import CameraPreview from './CameraPreview'
 import HandCursor, { type HandCursorHandle } from './HandCursor'
@@ -24,9 +25,14 @@ function MirrorCanvas() {
   const [heard, setHeard] = useState<{ id: number; text: string } | null>(null)
   const heardCount = useRef(0)
   const clearHeard = useCallback(() => setHeard(null), [])
+  // Bumped when custom widgets are registered, so the page re-renders with them.
+  const [widgetTypesVersion, setWidgetTypesVersion] = useState(0)
 
   const onMessage = useCallback((message: BackendMessage) => {
-    if (message.type === 'CAMERA_FRAME') {
+    if (message.type === 'WIDGET_TYPES') {
+      registerCustomWidgets(message.widgetTypes)
+      setWidgetTypesVersion((v) => v + 1)
+    } else if (message.type === 'CAMERA_FRAME') {
       setCameraFrame(message)
     } else if (message.type === 'POINTER') {
       cursorRef.current?.move(message.position)
@@ -64,7 +70,7 @@ function MirrorCanvas() {
         {isConnected && heard ? <VoiceTranscript key={heard.id} text={heard.text} onExpire={clearHeard} /> : null}
         {isConnected && cameraFrame ? <CameraPreview frame={cameraFrame} /> : null}
       </div>
-      <PageView key={state.nodeId ?? 'none'} widgets={state.widgets} />
+      <PageView key={`${state.nodeId ?? 'none'}:${widgetTypesVersion}`} widgets={state.widgets} />
       <Abdo ref={abdoRef} />
       {isConnected ? <HandCursor ref={cursorRef} /> : null}
     </div>

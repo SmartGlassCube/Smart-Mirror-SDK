@@ -24,6 +24,7 @@ All messages are JSON objects with a `type`.
 
 | `type` | Payload | Sent by | When |
 |---|---|---|---|
+| `WIDGET_TYPES` | `widgetTypes`: `[{type, name, code}]` | `ClientHub.handle_client` | Once, on connect before `INIT`, when the server has custom widgets (a Smart Mirror Studio project's). `code` is a CommonJS module whose default export is the React component; it may import only `react`. The frontend registers them (`widgets/customWidgets.ts`) |
 | `INIT` | `state` | `ClientHub.handle_client` | Once, on connect |
 | `STATE_UPDATE` | `state` | `ClientHub.broadcast_state` | The page or a widget changed (gesture, or new provider data) |
 | `CAMERA_FRAME` | `image`, `events` | `server/camera_preview.py` | At most 10×/s while a client is connected |

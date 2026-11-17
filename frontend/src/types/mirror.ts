@@ -41,7 +41,16 @@ export type PointerPosition = {
   y: number
 }
 
+// A custom widget from the backend: `code` is a compiled CommonJS module (see widgets/customWidgets.ts).
+export type CustomWidgetType = {
+  type: string
+  name: string
+  code: string
+}
+
 export type BackendMessage =
+  // Custom widgets to load before rendering (a Smart Mirror Studio project's); sent before INIT.
+  | { type: 'WIDGET_TYPES'; widgetTypes: CustomWidgetType[] }
   | { type: 'INIT' | 'STATE_UPDATE'; state: MirrorState }
   | ({ type: 'CAMERA_FRAME' } & CameraFrame)
   // Index fingertip for the cursor (server/hand_pointer.py); null when the hand is lost.

@@ -5,8 +5,10 @@ and returning the new `widget.data`. The server calls it every
 `widget.refresh_interval` seconds.
 """
 
+from .clock import ClockProvider
+from .http_json import HttpJsonProvider
 from .mongo_calendar import MongoCalendarProvider
 from .open_meteo import OpenMeteoWeatherProvider
 from .qr_catalog import QRCodeCatalogProvider
 
-__all__ = ["MongoCalendarProvider", "OpenMeteoWeatherProvider", "QRCodeCatalogProvider"]
+__all__ = ["ClockProvider", "HttpJsonProvider", "MongoCalendarProvider", "OpenMeteoWeatherProvider", "QRCodeCatalogProvider"]

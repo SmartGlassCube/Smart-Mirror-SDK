@@ -1,12 +1,23 @@
-"""Entry point: the `glasscube` command, or `python -m glasscube`."""
+"""Entry point: the `glasscube` command, or `python -m glasscube`.
 
+    glasscube                       the demo mirror (Smart Mirror Studio's demo project)
+    glasscube run my.glasscube.json a mirror designed in Smart Mirror Studio
+    glasscube club                  the IEEE INSAT club's mirror (pages.py, content sync from MONGO_URI)
+"""
+
+import argparse
 import asyncio
+import dataclasses
 import logging
+import sys
 
 from ..core import StateManager
 from ..hal import HAL
 from ..server import SmartMirrorServer
 from ..server.static_ui import bundled_ui_dir
+from .. import __version__
+from ..project import ProjectError, load_project
+from .demo import demo_project
 from .frontend_dev import FrontendLauncher
 from .pages import GESTURE_CONFIG, HOME, build_graph
 from .settings import Settings
@@ -64,7 +75,19 @@ def build_content_sync(settings):
     return build()
 
 
+def build_project_server(settings, project):
+    """A mirror from a Smart Mirror Studio project: its pages, links, widgets and custom widgets."""
+    return SmartMirrorServer(
+        state_manager=project.state_manager(),
+        widget_types=project.widget_types,
+        camera_id=settings.camera,
+        ws_port=settings.ws_port,
+        assistant=build_assistant(settings),
+    )
+
+
 def build_server(settings):
+    """The IEEE INSAT club's mirror (`glasscube club`): pages.py, plus club content when MONGO_URI is set."""
     content_sync = build_content_sync(settings)
     state_manager = StateManager(
         graph=build_graph(settings, content_sync),
@@ -104,15 +127,56 @@ def build_frontend(settings):
     return None
 
 
-def main():
+def parse_args(argv=None):
+    # Options go before or after the command; SUPPRESS keeps a subcommand from resetting them.
+    options = argparse.ArgumentParser(add_help=False)
+    options.add_argument("--port", type=int, default=argparse.SUPPRESS, help="WebSocket + UI port (GLASSCUBE_WS_PORT, default 8080)")
+    options.add_argument("--camera", default=argparse.SUPPRESS, help="camera index or lan_media_server URL (GLASSCUBE_CAMERA)")
+    options.add_argument("--no-assistant", action="store_true", default=argparse.SUPPRESS, help="don't start the voice assistant")
+
+    parser = argparse.ArgumentParser(
+        prog="glasscube",
+        parents=[options],
+        description="Run a gesture-controlled smart mirror. With no command, runs the demo mirror.",
+    )
+    parser.add_argument("--version", action="version", version=f"glasscube {__version__}")
+    commands = parser.add_subparsers(dest="command", metavar="command")
+    run_command = commands.add_parser("run", parents=[options], help="run a mirror designed in Smart Mirror Studio")
+    run_command.add_argument("project", help="a .glasscube.json or .glasscube.yaml file exported from the studio")
+    commands.add_parser("demo", parents=[options], help="run the demo mirror (the default)")
+    commands.add_parser("club", parents=[options], help="run the IEEE INSAT club's mirror (content from MONGO_URI)")
+    return parser.parse_args(argv)
+
+
+def apply_options(settings, args):
+    changes = {}
+    if hasattr(args, "port"):
+        changes["ws_port"] = args.port
+    if hasattr(args, "camera"):
+        changes["camera"] = int(args.camera) if args.camera.isdigit() else args.camera
+    if getattr(args, "no_assistant", False):
+        changes["assistant"] = False
+    return dataclasses.replace(settings, **changes)
+
+
+def main(argv=None):
+    args = parse_args(argv)
     # INFO on the glasscube.* loggers surfaces the voice pipeline's play-by-play
     # (VAD, raw Whisper transcripts, wake-word matches; see docs/voice-pipeline-testing.md).
     # Root stays at WARNING so third-party libraries don't drown it out.
     logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     logging.getLogger("glasscube").setLevel(logging.INFO)
 
-    settings = Settings.from_env()
-    server = build_server(settings)
+    settings = apply_options(Settings.from_env(), args)
+    try:
+        if args.command == "club":
+            server = build_server(settings)
+        else:
+            project = load_project(args.project) if args.command == "run" else demo_project()
+            logger.info("Running %r (%d pages)", project.name, len(project.pages))
+            server = build_project_server(settings, project)
+    except ProjectError as error:
+        sys.exit(f"glasscube: {error}")
     frontend = build_frontend(settings)
     try:
         asyncio.run(run(server, frontend))

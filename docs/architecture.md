@@ -37,10 +37,12 @@ Smart-Mirror-SDK/
 │   ├── pyproject.toml, uv.lock
 │   ├── .env.example               # every setting; copy to backend/.env
 │   ├── glasscube/               # the package
-│   │   ├── app/                   # the mirror app (`python -m glasscube`)
-│   │   │   ├── main.py            # builds content sync, assistant, pages, server; runs them
+│   │   ├── project.py             # Smart Mirror Studio projects -> graph, bindings, widgets
+│   │   ├── app/                   # the `glasscube` command (`python -m glasscube`)
+│   │   │   ├── main.py            # demo | run <file> | club: builds the server and runs it
+│   │   │   ├── demo.py            # the demo mirror: demo.glasscube.json, the studio's demo project
 │   │   │   ├── settings.py        # Settings.from_env(): every GLASSCUBE_* / MONGO_URI variable
-│   │   │   ├── pages.py           # the widgets and the page graph (draw <-> games <-> home <-> events)
+│   │   │   ├── pages.py           # `glasscube club`: the widgets and page graph (draw <-> games <-> home <-> events)
 │   │   │   └── frontend_dev.py    # FrontendLauncher: npm install + Vite dev server (dev convenience)
 │   │   ├── server/                # SmartMirrorServer and what it runs
 │   │   │   ├── app.py             # SmartMirrorServer: starts the loops, per-frame work, event images
@@ -103,7 +105,9 @@ Whisper, Piper). The MediaPipe model is downloaded into `backend/.data/models/` 
 
 ```bash
 cd backend
-uv run python -m glasscube
+uv run python -m glasscube          # the demo mirror (glasscube/app/demo.glasscube.json)
+uv run python -m glasscube club     # the IEEE INSAT club's mirror (glasscube/app/pages.py)
+uv run python -m glasscube run my-mirror.glasscube.json   # a Smart Mirror Studio project (glasscube/project.py)
 ```
 
 This does the following:

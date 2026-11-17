@@ -34,7 +34,8 @@ dependencies = [
   "mediapipe>=0.10.0",
   "opencv-python>=4.8.0",
   "websockets>=14.0",
-  "numpy>=1.24.0"
+  "numpy>=1.24.0",
+  "pyyaml>=6.0",  # Smart Mirror Studio projects exported as YAML
 ]
 
 [project.urls]
@@ -92,6 +93,7 @@ include = ["glasscube*"]
 [tool.setuptools.package-data]
 glasscube = [
   "config/json_config/*.json",
+  "app/demo.glasscube.json",
   "assistant/rag/seed_corpus/*",
   # The prebuilt UI: scripts/build_frontend.py, run before building the package
   "ui/*",
